@@ -94,16 +94,27 @@ def run_dynamic_tracker():
                     total = manager.get_total_count()
                     bit_status = manager.is_target_reached(target=6)
                     
-                    print(f"\n[NEW BOX DETECTED]")
-                    print(f"QR Content: {decoded}")
-                    print(f"Current Batch Count: {total}")
-                    print(f"PLC Status Bit: {bit_status}")
+                    # print(f"\n[NEW BOX DETECTED]")
+                    # print(f"QR Content: {decoded}")
+                    # print(f"Current Batch Count: {total}")
+                    # print(f"PLC Status Bit: {bit_status}")
                     
                     # Signal the PLC at port 40001
                     send_signal_to_plc(bit_status)
                     
                     # Send to API
                     post_to_api(decoded)
+
+                    # --- NEW: Check for Batch Completion & Reset ---
+                    if bit_status == 0:  # 0 means Target Reached (Inverted Logic)
+                        print(f"✅ BATCH COMPLETE! (Count: {total})")
+                        print("🔄 Resetting Counter for Next Batch...")
+                        
+                        manager.reset()
+                        
+                        # Send '1' to indicate new batch started
+                        send_signal_to_plc(1)
+                        print("🚀 New Batch Started (Signal: 1)")
                 else:
                     # This box has already been counted in this session
                     pass
