@@ -5,7 +5,7 @@ from qr_manager import QRManager
 import struct
 
 # --- Configuration ---
-HOST = "192.168.0.39"
+HOST = "192.168.0.78"
 PORT = 2002
 
 # PLC Configuration
@@ -83,8 +83,8 @@ def run_dynamic_tracker():
             if not decoded_buffer:
                 continue
 
-            # Split by newline in case multiple codes were sent in one packet
-            codes = [c.strip() for c in decoded_buffer.split('\n') if c.strip()]
+            # Split by semicolons and newlines — scanner sends multiple QRs per packet
+            codes = [c.strip() for c in decoded_buffer.replace('\n', ';').split(';') if c.strip()]
 
             for decoded in codes:
                 # --- Dynamic Tracking Logic ---

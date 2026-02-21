@@ -44,19 +44,21 @@ def run_tcp_client(host, port):
                 break
 
             try:
-                decoded = data.decode("utf-8")
+                decoded_buffer = data.decode("utf-8")
             except UnicodeDecodeError:
-                decoded = data.decode("utf-8", errors="ignore")
+                decoded_buffer = data.decode("utf-8", errors="ignore")
 
-            # Send to API and print locally only if not a duplicate
-            if decoded not in sent_codes:
-                # Print locally
-                print(decoded, end="", flush=True)
-                
-                post_to_api(decoded)
-                sent_codes.add(decoded)
-            else:
-                pass
+            # Split by semicolons (and newlines) to handle multiple QRs per packet
+            codes = [c.strip() for c in decoded_buffer.replace('\n', ';').split(';') if c.strip()]
+
+            for decoded in codes:
+                # Send to API and print locally only if not a duplicate
+                if decoded not in sent_codes:
+                    print(decoded, flush=True)
+                    post_to_api(decoded)
+                    sent_codes.add(decoded)
+                else:
+                    print(f"[DUP] {decoded}", flush=True)
 
     except KeyboardInterrupt:
         print("\nClient stopped by user.")
@@ -68,6 +70,6 @@ def run_tcp_client(host, port):
 
 
 if __name__ == "__main__":
-    HOST = "192.168.0.39"
+    HOST = "192.168.0.78"
     PORT = 2002
     run_tcp_client(HOST, PORT)
