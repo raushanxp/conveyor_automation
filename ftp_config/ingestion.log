@@ -1,0 +1,145 @@
+2026-02-24 12:45:17,284 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 12:45:17,284 - INFO - concurrency model: async
+2026-02-24 12:45:17,284 - INFO - masquerade (NAT) address: None
+2026-02-24 12:45:17,284 - INFO - passive ports: None
+2026-02-24 12:45:17,284 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=20292 <<<
+2026-02-24 12:46:22,745 - INFO - 192.168.0.78:55854-[] FTP session opened (connect)
+2026-02-24 12:46:22,749 - INFO - 192.168.0.78:55854-[User] USER 'User' logged in.
+2026-02-24 12:46:22,749 - INFO - User User logged in.
+2026-02-24 12:46:22,753 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:46:22,776 - INFO - 192.168.0.78:55854-[User] APPE /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.015
+2026-02-24 12:46:22,776 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:46:22,779 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:27,783 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 12:46:27,881 - INFO - 192.168.0.78:55854-[User] STOR /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124627851_2786_120.jpg completed=1 bytes=564144 seconds=0.093
+2026-02-24 12:46:27,881 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124627851_2786_120.jpg
+2026-02-24 12:46:27,882 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:27,882 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:46:27,885 - INFO - 192.168.0.78:55854-[User] APPE /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.001
+2026-02-24 12:46:27,885 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:46:27,885 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:29,861 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 12:46:29,958 - INFO - 192.168.0.78:55854-[User] STOR /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124629926_2802_120.jpg completed=1 bytes=564214 seconds=0.09
+2026-02-24 12:46:29,958 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124629926_2802_120.jpg
+2026-02-24 12:46:29,959 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:29,960 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:46:29,963 - INFO - 192.168.0.78:55854-[User] APPE /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.002
+2026-02-24 12:46:29,964 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:46:29,966 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:31,881 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 12:46:31,972 - INFO - 192.168.0.78:55854-[User] STOR /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124631947_2818_120.jpg completed=1 bytes=564303 seconds=0.084
+2026-02-24 12:46:31,972 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124631947_2818_120.jpg
+2026-02-24 12:46:31,975 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:31,979 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:46:31,982 - INFO - 192.168.0.78:55854-[User] APPE /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.001
+2026-02-24 12:46:31,982 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:46:31,982 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:33,912 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 12:46:33,991 - INFO - 192.168.0.78:55854-[User] STOR /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124633976_2834_120.jpg completed=1 bytes=563513 seconds=0.075
+2026-02-24 12:46:33,991 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/ok/20260224_124633976_2834_120.jpg
+2026-02-24 12:46:33,992 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:46:33,995 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:46:34,010 - INFO - 192.168.0.78:55854-[User] APPE /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.003
+2026-02-24 12:46:34,010 - INFO - Successfully received file: /home/finch/Downloads/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:46:34,018 - INFO - 192.168.0.78:55854-[User] CWD /home/finch/Downloads/hik-cam-data 250
+2026-02-24 12:48:25,493 - INFO - received interrupt signal
+2026-02-24 12:48:25,493 - INFO - >>> shutting down FTP server, pid=20292, 2 open socket(s) <<<
+2026-02-24 12:48:25,493 - INFO - 192.168.0.78:55854-[User] FTP session closed (disconnect).
+2026-02-24 12:48:27,307 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 12:48:27,307 - INFO - concurrency model: async
+2026-02-24 12:48:27,307 - INFO - masquerade (NAT) address: None
+2026-02-24 12:48:27,307 - INFO - passive ports: None
+2026-02-24 12:48:27,307 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=20526 <<<
+2026-02-24 12:48:32,769 - INFO - 192.168.0.78:55880-[] FTP session opened (connect)
+2026-02-24 12:48:32,773 - INFO - 192.168.0.78:55880-[User] USER 'User' logged in.
+2026-02-24 12:48:32,773 - INFO - User User logged in.
+2026-02-24 12:48:32,776 - INFO - 192.168.0.78:55880-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 550 'No such file or directory.'
+2026-02-24 12:48:32,778 - INFO - 192.168.0.78:55880-[User] MKD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78 257
+2026-02-24 12:48:32,781 - INFO - 192.168.0.78:55880-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78 250
+2026-02-24 12:48:32,783 - INFO - 192.168.0.78:55880-[User] MKD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 257
+2026-02-24 12:48:32,785 - INFO - 192.168.0.78:55880-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:48:32,798 - INFO - 192.168.0.78:55880-[User] APPE /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.004
+2026-02-24 12:48:32,798 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:48:32,801 - INFO - 192.168.0.78:55880-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 12:52:27,387 - INFO - received interrupt signal
+2026-02-24 12:52:27,388 - INFO - >>> shutting down FTP server, pid=20526, 2 open socket(s) <<<
+2026-02-24 12:52:27,388 - INFO - 192.168.0.78:55880-[User] FTP session closed (disconnect).
+2026-02-24 12:52:28,633 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 12:52:28,633 - INFO - concurrency model: async
+2026-02-24 12:52:28,633 - INFO - masquerade (NAT) address: None
+2026-02-24 12:52:28,633 - INFO - passive ports: None
+2026-02-24 12:52:28,633 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=20761 <<<
+2026-02-24 12:52:51,217 - INFO - received interrupt signal
+2026-02-24 12:52:51,217 - INFO - >>> shutting down FTP server, pid=20761, 1 open socket(s) <<<
+2026-02-24 12:53:03,459 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 12:53:03,459 - INFO - concurrency model: async
+2026-02-24 12:53:03,459 - INFO - masquerade (NAT) address: None
+2026-02-24 12:53:03,459 - INFO - passive ports: None
+2026-02-24 12:53:03,459 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=20853 <<<
+2026-02-24 12:53:07,704 - INFO - 192.168.0.78:55892-[] FTP session opened (connect)
+2026-02-24 12:53:07,707 - INFO - 192.168.0.78:55892-[User] USER 'User' logged in.
+2026-02-24 12:53:07,708 - INFO - User User logged in.
+2026-02-24 12:53:07,711 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok 550 'No such file or directory.'
+2026-02-24 12:53:07,713 - INFO - 192.168.0.78:55892-[User] MKD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78 550 'File exists.'
+2026-02-24 12:53:07,715 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78 250
+2026-02-24 12:53:07,717 - INFO - 192.168.0.78:55892-[User] MKD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 550 'File exists.'
+2026-02-24 12:53:07,719 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:53:07,721 - INFO - 192.168.0.78:55892-[User] MKD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok 257
+2026-02-24 12:53:07,724 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 12:53:07,801 - INFO - 192.168.0.78:55892-[User] STOR /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok/20260224_125307792_2841_123.jpg completed=1 bytes=563836 seconds=0.065
+2026-02-24 12:53:07,801 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok/20260224_125307792_2841_123.jpg
+2026-02-24 12:53:07,802 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 12:53:07,803 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:53:07,805 - INFO - 192.168.0.78:55892-[User] APPE /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.001
+2026-02-24 12:53:07,805 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:53:07,806 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 12:53:34,077 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 12:53:34,154 - INFO - 192.168.0.78:55892-[User] STOR /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok/20260224_125334167_2842_124.jpg completed=1 bytes=548924 seconds=0.07
+2026-02-24 12:53:34,154 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok/20260224_125334167_2842_124.jpg
+2026-02-24 12:53:34,156 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 12:53:34,159 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 12:53:34,174 - INFO - 192.168.0.78:55892-[User] APPE /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.002
+2026-02-24 12:53:34,174 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 12:53:34,175 - INFO - 192.168.0.78:55892-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 12:58:34,176 - INFO - 192.168.0.78:55892-[User] Control connection timed out.
+2026-02-24 12:58:34,176 - INFO - 192.168.0.78:55892-[User] FTP session closed (disconnect).
+2026-02-24 13:05:02,125 - INFO - received interrupt signal
+2026-02-24 13:05:02,126 - INFO - >>> shutting down FTP server, pid=20853, 1 open socket(s) <<<
+2026-02-24 13:05:14,302 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 13:05:14,303 - INFO - concurrency model: async
+2026-02-24 13:05:14,303 - INFO - masquerade (NAT) address: None
+2026-02-24 13:05:14,303 - INFO - passive ports: None
+2026-02-24 13:05:14,303 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=21523 <<<
+2026-02-24 13:05:19,617 - INFO - 192.168.0.78:55902-[] FTP session opened (connect)
+2026-02-24 13:05:19,618 - INFO - 192.168.0.78:55902-[User] USER 'User' logged in.
+2026-02-24 13:05:19,618 - INFO - User User logged in.
+2026-02-24 13:05:19,619 - INFO - 192.168.0.78:55902-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 13:05:19,622 - INFO - 192.168.0.78:55902-[User] APPE /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.001
+2026-02-24 13:05:19,622 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 13:05:19,623 - INFO - 192.168.0.78:55902-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 13:05:38,820 - INFO - 192.168.0.78:55902-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok 250
+2026-02-24 13:05:38,871 - INFO - 192.168.0.78:55902-[User] STOR /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok/20260224_130538947_2844_126.jpg completed=1 bytes=560853 seconds=0.049
+2026-02-24 13:05:38,871 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/ok/20260224_130538947_2844_126.jpg
+2026-02-24 13:05:38,872 - INFO - 192.168.0.78:55902-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 13:05:38,873 - INFO - 192.168.0.78:55902-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 13:05:38,875 - INFO - 192.168.0.78:55902-[User] APPE /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.001
+2026-02-24 13:05:38,875 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 13:05:38,876 - INFO - 192.168.0.78:55902-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 13:05:53,125 - INFO - received interrupt signal
+2026-02-24 13:05:53,125 - INFO - >>> shutting down FTP server, pid=21523, 2 open socket(s) <<<
+2026-02-24 13:05:53,126 - INFO - 192.168.0.78:55902-[User] FTP session closed (disconnect).
+2026-02-24 13:09:37,786 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 13:09:37,786 - INFO - concurrency model: async
+2026-02-24 13:09:37,786 - INFO - masquerade (NAT) address: None
+2026-02-24 13:09:37,786 - INFO - passive ports: None
+2026-02-24 13:09:37,786 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=21758 <<<
+2026-02-24 13:09:44,022 - INFO - 192.168.0.78:55914-[] FTP session opened (connect)
+2026-02-24 13:09:44,023 - INFO - 192.168.0.78:55914-[User] USER 'User' logged in.
+2026-02-24 13:09:44,024 - INFO - User User logged in.
+2026-02-24 13:09:44,025 - INFO - 192.168.0.78:55914-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image 250
+2026-02-24 13:09:44,028 - INFO - 192.168.0.78:55914-[User] APPE /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv completed=1 bytes=504 seconds=0.001
+2026-02-24 13:09:44,028 - INFO - Successfully received file: /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data/192.168.0.78/image/20260224.csv
+2026-02-24 13:09:44,029 - INFO - 192.168.0.78:55914-[User] CWD /home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data 250
+2026-02-24 13:11:26,410 - INFO - received interrupt signal
+2026-02-24 13:11:26,410 - INFO - >>> shutting down FTP server, pid=21758, 2 open socket(s) <<<
+2026-02-24 13:11:26,411 - INFO - 192.168.0.78:55914-[User] FTP session closed (disconnect).
