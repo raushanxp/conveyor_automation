@@ -143,3 +143,19 @@
 2026-02-24 13:11:26,410 - INFO - received interrupt signal
 2026-02-24 13:11:26,410 - INFO - >>> shutting down FTP server, pid=21758, 2 open socket(s) <<<
 2026-02-24 13:11:26,411 - INFO - 192.168.0.78:55914-[User] FTP session closed (disconnect).
+2026-02-24 13:29:45,134 - INFO - Starting FTP server on 192.168.0.77:2005
+2026-02-24 13:29:45,135 - INFO - concurrency model: async
+2026-02-24 13:29:45,135 - INFO - masquerade (NAT) address: None
+2026-02-24 13:29:45,136 - INFO - passive ports: None
+2026-02-24 13:29:45,136 - INFO - >>> starting FTP server on 192.168.0.77:2005, pid=3016 <<<
+2026-02-24 13:29:51,905 - INFO - 192.168.0.78:55920-[] FTP session opened (connect)
+2026-02-24 13:29:51,910 - INFO - 192.168.0.78:55920-[User] USER 'User' logged in.
+2026-02-24 13:29:51,910 - INFO - User User logged in.
+2026-02-24 13:29:51,916 - INFO - 192.168.0.78:55920-[User] CWD C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78\image 550 'No such file or directory.'
+2026-02-24 13:29:51,919 - INFO - 192.168.0.78:55920-[User] MKD C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78 257
+2026-02-24 13:29:51,923 - INFO - 192.168.0.78:55920-[User] CWD C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78 250
+2026-02-24 13:29:51,927 - INFO - 192.168.0.78:55920-[User] MKD C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78\image 257
+2026-02-24 13:29:51,931 - INFO - 192.168.0.78:55920-[User] CWD C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78\image 250
+2026-02-24 13:29:51,944 - INFO - 192.168.0.78:55920-[User] APPE C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78\image\20260224.csv completed=1 bytes=504 seconds=0.004
+2026-02-24 13:29:51,945 - INFO - Successfully received file: C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data\192.168.0.78\image\20260224.csv
+2026-02-24 13:29:51,948 - INFO - 192.168.0.78:55920-[User] CWD C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\conveyor_automation\ftp_config\hik-camera-data 250

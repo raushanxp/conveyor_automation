@@ -1,2 +1,4 @@
 __pycache__/
+ftp_config/hik-camera-data/
 *.pyc
+venv/
