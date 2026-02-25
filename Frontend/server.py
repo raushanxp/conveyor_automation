@@ -15,6 +15,8 @@ PLC_PORT = 502
 plc_socket = None
 # List to hold multiple scanned codes
 scanned_qr_codes = [] 
+# Expected number of boxes the worker will place on the conveyor
+expected_box_count = 0
 
 def connect_to_plc():
     """Establish a persistent connection to the PLC"""
@@ -127,6 +129,29 @@ def handle_qr():
     elif request.method == 'GET':
         # Return the entire list to React
         return jsonify({"qr_codes": scanned_qr_codes})
+
+# ── ROUTE 3: PAYLOAD — SET/GET EXPECTED BOX COUNT ──
+@app.route('/api/payload', methods=['POST', 'GET'])
+def handle_payload():
+    global expected_box_count
+
+    if request.method == 'POST':
+        data = request.json
+        count = data.get('box_count')
+
+        if count is None or not isinstance(count, int) or count < 1:
+            return jsonify({"success": False, "error": "Invalid box_count. Must be a positive integer."}), 400
+
+        expected_box_count = count
+        print(f"📦 Payload set: expecting {expected_box_count} boxes on conveyor")
+        return jsonify({"success": True, "expected_box_count": expected_box_count})
+
+    elif request.method == 'GET':
+        return jsonify({
+            "expected_box_count": expected_box_count,
+            "actual_box_count": len(scanned_qr_codes),
+            "match": len(scanned_qr_codes) == expected_box_count
+        })
 
 if __name__ == "__main__":
     # Pointing to 0.0.0.0 allows React to connect via your network IP
