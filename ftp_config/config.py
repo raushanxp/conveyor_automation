@@ -8,8 +8,7 @@ FTP_PASS = "123456"
 
 # Storage Settings
 # The user specified this path for image storage
-DATA_DIR = "/home/finch/Downloads/webhook/smt-dev/ftp_config/hik-cam-data"
-
+DATA_DIR = r"C:\Users\akash\OneDrive\Desktop\simpel\Lux_Wms\lux_wms\ftp_config\hik-camera-data"
 # Ensure data directory exists
 if not os.path.exists(DATA_DIR):
     os.makedirs(DATA_DIR, exist_ok=True)
