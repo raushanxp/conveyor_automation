@@ -1,35 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Upload, Clock, CheckCircle, Calendar } from "lucide-react";
 import Layout from "../components/Layout";
-
-/* ── Dummy Data ── */
-const orders = [
-  { id: "PO-2024-1235", sub: "Warehouse B", status: "Picking", items: 45, date: "05/12/2025" },
-  { id: "PO-2024-1235", sub: "Warehouse B", status: "Picking", items: 45, date: "05/12/2025" },
-  { id: "PO-2024-1235", sub: "Warehouse B", status: "Picking", items: 45, date: "05/12/2025" },
-  { id: "PO-2024-1235", sub: "Warehouse B", status: "Picking", items: 45, date: "05/12/2025" },
-  { id: "PO-2024-1235", sub: "Warehouse B", status: "Picking", items: 45, date: "05/12/2025" },
-  { id: "PO-2024-1236", sub: "Warehouse A", status: "Picking", items: 30, date: "06/12/2025" },
-  { id: "PO-2024-1237", sub: "Warehouse C", status: "Picking", items: 60, date: "06/12/2025" },
-  { id: "PO-2024-1238", sub: "Warehouse B", status: "Picking", items: 20, date: "07/12/2025" },
-  { id: "PO-2024-1239", sub: "Warehouse A", status: "Picking", items: 55, date: "07/12/2025" },
-  { id: "PO-2024-1240", sub: "Warehouse C", status: "Picking", items: 40, date: "08/12/2025" },
-  { id: "PO-2024-1241", sub: "Warehouse B", status: "Picking", items: 75, date: "08/12/2025" },
-  { id: "PO-2024-1242", sub: "Warehouse A", status: "Picking", items: 45, date: "09/12/2025" },
-  { id: "PO-2024-1243", sub: "Warehouse C", status: "Picking", items: 90, date: "09/12/2025" },
-  { id: "PO-2024-1244", sub: "Warehouse B", status: "Picking", items: 35, date: "10/12/2025" },
-  { id: "PO-2024-1245", sub: "Warehouse A", status: "Picking", items: 50, date: "10/12/2025" },
-  { id: "PO-2024-1246", sub: "Warehouse C", status: "Picking", items: 45, date: "11/12/2025" },
-  { id: "PO-2024-1247", sub: "Warehouse B", status: "Picking", items: 65, date: "11/12/2025" },
-  { id: "PO-2024-1248", sub: "Warehouse A", status: "Picking", items: 45, date: "12/12/2025" },
-  { id: "PO-2024-1249", sub: "Warehouse C", status: "Picking", items: 80, date: "12/12/2025" },
-  { id: "PO-2024-1250", sub: "Warehouse B", status: "Picking", items: 45, date: "13/12/2025" },
-  { id: "PO-2024-1251", sub: "Warehouse A", status: "Picking", items: 25, date: "13/12/2025" },
-  { id: "PO-2024-1252", sub: "Warehouse C", status: "Picking", items: 45, date: "14/12/2025" },
-  { id: "PO-2024-1253", sub: "Warehouse B", status: "Picking", items: 70, date: "14/12/2025" },
-  { id: "PO-2024-1254", sub: "Warehouse A", status: "Picking", items: 45, date: "15/12/2025" },
-  { id: "PO-2024-1255", sub: "Warehouse C", status: "Picking", items: 55, date: "15/12/2025" },
-];
+import axios from "axios";
+import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom"; // 🟢 IMPORT ADDED
 
 const ITEMS_PER_PAGE = 5;
 
@@ -85,9 +59,12 @@ const StatCard = ({ label, value, iconBg, icon }) => (
 );
 
 /* ── Table Row ── */
-const TableRow = ({ id, sub, status, items, date }) => (
-  <tr className="border-b border-gray-100 last:border-0">
-
+// 🟢 ADDED onClick prop and cursor-pointer class
+const TableRow = ({ id, sub, status, itemCount, date, onClick }) => (
+  <tr 
+    onClick={onClick} 
+    className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors cursor-pointer"
+  >
     {/* Order ID */}
     <td className="px-6 py-5">
       <div className="flex items-center gap-3">
@@ -106,17 +83,17 @@ const TableRow = ({ id, sub, status, items, date }) => (
       </span>
     </td>
 
-    {/* Items Details — box icon + count */}
+    {/* No Of Items Count */}
     <td className="px-6 py-5">
       <div className="flex items-center gap-2">
         <BoxSVG size={14} color="#9CA3AF" />
-        <span className="text-sm text-gray-800">
-          <span className="font-semibold">{items}</span> Items
+        <span className="text-sm text-gray-800 font-bold">
+          {itemCount} <span className="text-xs font-normal text-gray-500">Products</span>
         </span>
       </div>
     </td>
 
-    {/* Delivery Date */}
+    {/* Order Date */}
     <td className="px-6 py-5">
       <div className="flex items-center gap-2 text-sm text-gray-600">
         <Calendar size={14} className="text-gray-400" />
@@ -128,13 +105,91 @@ const TableRow = ({ id, sub, status, items, date }) => (
 
 /* ── Dashboard ── */
 const Dashboard = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(orders.length / ITEMS_PER_PAGE);
+  const navigate = useNavigate(); // 🟢 ADDED NAVIGATE
+
+  // Fetch data from API on component mount
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const currentDate = `${year}-${month}-${day}`;
+
+        const payload = {
+          from_date: "2025-01-10",
+          to_date: currentDate
+        };
+
+        const res = await axios.post(
+          "http://wmsbeta.luxkutumb.info/api/sap/getPurchaseOrderByDate", 
+          payload, 
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        if (res.data.status === "success") {
+          const apiData = res.data.data;
+          const dataArray = Array.isArray(apiData) ? apiData : [apiData];
+          
+          const formattedOrders = dataArray.map((order) => {
+            let finalCount = 0;
+            if (order.items) {
+              if (Array.isArray(order.items)) {
+                finalCount = order.items.length;
+              } else if (typeof order.items === 'string') {
+                try { finalCount = JSON.parse(order.items).length; } catch (e) { finalCount = 0; }
+              } else if (typeof order.items === 'object') {
+                finalCount = Object.keys(order.items).length;
+              }
+            }
+
+            // We also keep the raw order data to pass to the next screen if needed
+            return {
+              id: order.id, 
+              sub: `PO: ${order.order_code}`, 
+              status: order.order_status,
+              itemCount: finalCount, 
+              date: order.order_date,
+              rawOrder: order // 🟢 Saving the raw object 
+            };
+          });
+
+          setOrders(formattedOrders);
+        } else {
+          toast.error(res.data.message || "Failed to fetch orders");
+        }
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+        toast.error("Network error while fetching orders.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
+  // 🟢 Handle Row Click Function
+  const handleRowClick = (order) => {
+    // Navigates to /po-details and silently passes the raw order data
+    navigate("/po-details", { state: { orderData: order.rawOrder } });
+  };
+
+  const totalPages = Math.max(1, Math.ceil(orders.length / ITEMS_PER_PAGE));
   const paginated = orders.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   return (
     <Layout>
-
       {/* ── Page Header ── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between mb-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -154,19 +209,19 @@ const Dashboard = () => {
       <div className="flex gap-4 mb-4">
         <StatCard
           label="Pending Orders"
-          value="12"
+          value={orders.filter(o => o.status === "Pending").length || "0"}
           iconBg="#FEE2E2"
           icon={<Clock size={22} color="#EF4444" />}
         />
         <StatCard
           label="Currently Picking"
-          value="5"
+          value={orders.filter(o => o.status === "Picking").length || "0"}
           iconBg="#EEF2FF"
           icon={<BoxSVG size={22} color="#6366F1" />}
         />
         <StatCard
           label="Completed"
-          value="28"
+          value={orders.filter(o => o.status === "Completed").length || "0"}
           iconBg="#D1FAE5"
           icon={<CheckCircle size={22} color="#10B981" />}
         />
@@ -174,35 +229,55 @@ const Dashboard = () => {
 
       {/* ── Orders Table ── */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-
         {/* Toolbar */}
         <div className="flex items-center justify-between px-6 py-3 border-b border-gray-100">
           <button className="border border-gray-300 bg-white text-sm font-medium text-gray-700 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             Active
           </button>
-          <span className="text-sm text-gray-400">Showing 5 orders</span>
+          <span className="text-sm text-gray-400">Showing {orders.length} Purchase Orders</span>
         </div>
 
         {/* Table */}
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-100">
-              {["ORDER ID", "STATUS", "ITEMS DETAILS", "DELIVERY DATE"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((order, i) => (
-              <TableRow key={i} {...order} />
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100">
+                {["ORDER ID", "STATUS", "NO OF ITEMS", "ORDER DATE"].map((h) => (
+                  <th
+                    key={h}
+                    className="px-6 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
+                    Loading orders...
+                  </td>
+                </tr>
+              ) : paginated.length > 0 ? (
+                // 🟢 Added onClick to the rendered rows
+                paginated.map((order, i) => (
+                  <TableRow 
+                    key={i} 
+                    {...order} 
+                    onClick={() => handleRowClick(order)} 
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
+                    No orders found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
@@ -219,7 +294,7 @@ const Dashboard = () => {
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
+              disabled={page === totalPages || totalPages === 0}
               className="border border-gray-200 bg-white text-sm font-medium text-gray-700 px-4 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
             >
               Next
@@ -227,7 +302,6 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-
     </Layout>
   );
 };
