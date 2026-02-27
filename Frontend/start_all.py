@@ -37,19 +37,22 @@ print(f"   Backend:  {BACKEND_DIR}")
 print(f"   Frontend: {BASE_DIR}")
 print("")
 
+# Use the same Python that's running this script (works on any PC)
+PYTHON = sys.executable
+
 # Start backend services
 print("Starting backend services...\n")
 
-start_process("python server.py", cwd=BACKEND_DIR)
+start_process(f"{PYTHON} server.py", cwd=BACKEND_DIR)
 print("  ✅ Flask PLC Bridge       (port 5000)")
 
-start_process("python tcp_client.py", cwd=BACKEND_DIR)
+start_process(f"{PYTHON} tcp_client.py", cwd=BACKEND_DIR)
 print("  ✅ QR Scanner TCP Client")
 
-start_process("python ftp_server.py", cwd=BACKEND_DIR)
+start_process(f"{PYTHON} ftp_server.py", cwd=BACKEND_DIR)
 print("  ✅ FTP Camera Server      (port 2005)")
 
-start_process("python api_server.py", cwd=BACKEND_DIR)
+start_process(f"{PYTHON} api_server.py", cwd=BACKEND_DIR)
 print("  ✅ Camera Image API       (port 8000)")
 
 print("\nStarting frontend...\n")
