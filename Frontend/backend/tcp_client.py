@@ -22,8 +22,6 @@ def run_tcp_client(host, port):
         print(f"Connecting to {host} port {port}...")
         sock.connect(server_address)
         print("Connected.")
-        
-        sent_codes = set()
 
         while True:
             data = sock.recv(4096)
@@ -37,25 +35,21 @@ def run_tcp_client(host, port):
                 decoded_buffer = data.decode("utf-8", errors="ignore")
 
             codes = [c.strip() for c in decoded_buffer.replace('\n', ';').split(';') if c.strip()]
-            
-            # NEW: Collect all new codes in a list to send to React at once
-            batch_for_react = []
+
+            # Filter out NoRead signals from the scanner
+            codes = [c for c in codes if c.lower() != "noread"]
 
             for decoded in codes:
-                if decoded not in sent_codes:
-                    print(decoded, flush=True)
-                    post_to_cloud_api(decoded) # Send to cloud API
-                    sent_codes.add(decoded)
-                    batch_for_react.append(decoded) # Add to React batch
-                else:
-                    print(f"[DUP] {decoded}", flush=True)
-                    
-            # NEW: Send the whole batch to the local React UI in one single request
-            if batch_for_react:
-                try:
-                    requests.post(LOCAL_BRIDGE_URL, json={"qr_codes": batch_for_react}, timeout=2)
-                except Exception:
-                    pass # Silently fail if React bridge is off
+                print(decoded, flush=True)
+                post_to_cloud_api(decoded)
+
+            # Send the batch to the local React UI (even if empty — triggers validation)
+            try:
+                requests.post(LOCAL_BRIDGE_URL, json={"qr_codes": codes}, timeout=2)
+            except Exception:
+                pass  # Silently fail if React bridge is off
+
+            print(f"\n📦 Boxes detected: {len(codes)}\n", flush=True)
 
     except KeyboardInterrupt:
         print("\nClient stopped by user.")
