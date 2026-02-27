@@ -1,9 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Printer } from "lucide-react";
 import Layout from "../components/Layout";
-import { Link } from "react-router-dom";
-import axios from "axios";
-import toast from "react-hot-toast";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -61,80 +59,35 @@ const TableRow = ({ name, sku, type, qty, packed }) => (
 
 /* ── DeliveryInfo Page ── */
 const DeliveryInfo = () => {
-  const [orderInfo, setOrderInfo] = useState(null);
-  const [deliveryItems, setDeliveryItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // ✅ Use the order data passed from Dashboard via router state
+  const location = useLocation();
+  const navigate = useNavigate();
+  const orderData = location.state?.orderData || null;
+
   const [page, setPage] = useState(1);
 
-  // Fetch data from API on component mount
-  useEffect(() => {
-    const fetchOrderDetails = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        
-        // Calculate today's date for payload
-        const today = new Date();
-        const year = today.getFullYear();
-        const month = String(today.getMonth() + 1).padStart(2, '0');
-        const day = String(today.getDate()).padStart(2, '0');
-        const currentDate = `${year}-${month}-${day}`;
+  // ✅ Parse items from the passed orderData
+  let deliveryItems = [];
+  if (orderData && orderData.items) {
+    let parsedItems = orderData.items;
+    if (typeof parsedItems === "string") {
+      try { parsedItems = JSON.parse(parsedItems); } catch (e) { parsedItems = []; }
+    }
+    if (!Array.isArray(parsedItems)) parsedItems = [];
 
-        const payload = {
-          from_date: "2025-01-10",
-          to_date: currentDate
-        };
+    deliveryItems = parsedItems.map((item) => ({
+      name: item.name || "Unknown Product",
+      sku: item.sku || "N/A",
+      type: "PCS",
+      qty: item.qty || 0,
+      packed: 0,
+    }));
+  }
 
-        const res = await axios.post(
-          "http://wmsbeta.luxkutumb.info/api/sap/getPurchaseOrderByDate", 
-          payload, 
-          {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          }
-        );
-
-        if (res.data.status === "success") {
-          const apiData = res.data.data;
-          // Extract array
-          const dataArray = Array.isArray(apiData) ? apiData : [apiData];
-          
-          if (dataArray.length > 0) {
-            // Use the FIRST order in the array for this details page
-            const currentOrder = dataArray[0];
-            setOrderInfo(currentOrder);
-
-            // Safely extract the items array
-            let parsedItems = currentOrder.items;
-            if (typeof parsedItems === 'string') {
-              try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
-            }
-            if (!Array.isArray(parsedItems)) parsedItems = [];
-
-            // Map the API items to the table's format
-            const formattedItems = parsedItems.map((item) => ({
-              name: item.name || "Unknown Product",
-              sku: item.sku || "N/A",
-              type: "PCS", // Defaulting to PCS based on clothing items, change if needed
-              qty: item.qty || 0,
-              packed: 0 // Defaulting to 0 since API doesn't provide packed amount yet
-            }));
-
-            setDeliveryItems(formattedItems);
-          }
-        } else {
-          toast.error(res.data.message || "Failed to fetch order details");
-        }
-      } catch (err) {
-        console.error("Error fetching order:", err);
-        toast.error("Network error while fetching order details.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchOrderDetails();
-  }, []);
+  // ✅ Navigate to /scan and pass the full raw order for context
+  const handleStartInwarding = () => {
+    navigate("/scan", { state: { orderData } });
+  };
 
   const totalPages = Math.max(1, Math.ceil(deliveryItems.length / ITEMS_PER_PAGE));
   const paginated = deliveryItems.slice(
@@ -161,7 +114,7 @@ const DeliveryInfo = () => {
           </div>
           <div>
             <h2 className="text-[15px] font-bold text-gray-900">
-              {orderInfo ? `PO-${orderInfo.order_code}` : "Loading..."}
+              {orderData ? `PO-${orderData.order_code}` : "No Order Selected"}
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">Delivery Information</p>
           </div>
@@ -172,13 +125,17 @@ const DeliveryInfo = () => {
             <Printer size={14} />
             Print Label
           </button>
-          <Link to="/scan" className="bg-red-500  hover:bg-red-600 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors shadow-sm">
+          {/* ✅ Pass orderData to scanning page */}
+          <button
+            onClick={handleStartInwarding}
+            className="bg-red-500 hover:bg-red-600 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors shadow-sm"
+          >
             Start Inwarding
-          </Link>
+          </button>
         </div>
       </div>
 
-      {/* ── Stat Cards — 4 separate white cards ── */}
+      {/* ── Stat Cards ── */}
       <div className="grid grid-cols-4 gap-4 mb-4">
 
         {/* Total Items */}
@@ -186,7 +143,7 @@ const DeliveryInfo = () => {
           <div>
             <p className="text-sm text-gray-500">Total Items</p>
             <p className="text-3xl font-bold text-gray-900 mt-1">
-              {loading ? "..." : deliveryItems.length}
+              {deliveryItems.length}
             </p>
           </div>
           <IndigoBoxIcon />
@@ -195,11 +152,11 @@ const DeliveryInfo = () => {
         {/* Cartons Packed */}
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
-            <p className="text-sm text-gray-500">Cartons Packed</p>
+            <p className="text-sm text-gray-500">Total Quantity</p>
             <p className="text-3xl font-bold text-gray-900 mt-1">
-              0 <span className="text-sm font-normal text-gray-400">of 6</span>
+              {orderData?.total_quantity ? parseFloat(orderData.total_quantity).toFixed(0) : "0"}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">estimated</p>
+            <p className="text-xs text-gray-400 mt-0.5">units expected</p>
           </div>
           <IndigoBoxIcon />
         </div>
@@ -209,7 +166,7 @@ const DeliveryInfo = () => {
           <div>
             <p className="text-sm text-gray-500">Order Date</p>
             <p className="text-[22px] font-bold text-gray-900 mt-2">
-              {orderInfo ? orderInfo.order_date : "--/--/----"}
+              {orderData ? orderData.order_date : "--/--/----"}
             </p>
           </div>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#D1FAE5" }}>
@@ -227,7 +184,7 @@ const DeliveryInfo = () => {
           <div>
             <p className="text-sm text-gray-500">Status</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
-              {orderInfo ? orderInfo.order_status : "..."}
+              {orderData ? orderData.order_status : "..."}
             </p>
           </div>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF3C7" }}>
@@ -267,20 +224,14 @@ const DeliveryInfo = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {deliveryItems.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
-                    Loading items...
+                    {orderData ? "No items found for this order." : "No order selected. Go back to the dashboard."}
                   </td>
                 </tr>
-              ) : paginated.length > 0 ? (
-                paginated.map((item, i) => <TableRow key={i} {...item} />)
               ) : (
-                <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
-                    No items found for this order.
-                  </td>
-                </tr>
+                paginated.map((item, i) => <TableRow key={i} {...item} />)
               )}
             </tbody>
           </table>

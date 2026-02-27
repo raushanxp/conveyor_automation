@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Play,
   CheckCircle,
@@ -14,36 +14,77 @@ import {
   Layers,
   AlertCircle,
   Scan,
-  Package,
-  ChevronRight
+  RefreshCw,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import Layout from "../components/Layout";
-import { useLocation, useNavigate } from "react-router-dom"; // 🟢 ADDED FOR ROUTING
+import { useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
 
-/* ── MOCK DATA ── */
+/* ── MOCK CHECKLIST ── */
 const checklistItems = [
-  { label: "Verify Package Integrity", done: true },
-  { label: "Confirm Label Accuracy", done: false },
+  { label: "Verify Package Integrity",       done: true  },
+  { label: "Confirm Label Accuracy",         done: false },
   { label: "Weight Check (Expected: 2.5kg)", done: false },
-  { label: "Seal Inspection", done: false },
-  { label: "Barcode Readability", done: false },
+  { label: "Seal Inspection",                done: false },
+  { label: "Barcode Readability",            done: false },
 ];
 
+/* ─────────────────────────────────────────
+   SYNC CONFIRMATION MODAL
+   Shows a summary before actually syncing
+───────────────────────────────────────── */
+const SyncModal = ({ isOpen, onClose, onConfirm, totalQRs, orderCode, isSyncing }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-indigo-50 p-6 pb-5 flex items-start gap-4 border-b border-indigo-100">
+          <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+            <Upload className="text-indigo-600" size={22} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Sync to Server</h3>
+            <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
+              You are about to sync <span className="font-bold text-indigo-700">{totalQRs} QR code(s)</span> for PO <span className="font-bold text-indigo-700">{orderCode}</span>. This action will submit the inward data to the server.
+            </p>
+          </div>
+        </div>
+        <div className="p-6 pt-5 flex items-center justify-end gap-3">
+          <button
+            onClick={onClose}
+            disabled={isSyncing}
+            className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isSyncing}
+            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-60 flex items-center gap-2 min-w-[110px] justify-center"
+          >
+            {isSyncing ? (
+              <><Loader2 size={16} className="animate-spin" /> Syncing...</>
+            ) : (
+              <><Upload size={16} /> Confirm Sync</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
-const products = [
-  { name: "Lux Cozi", sku: "LX-AM90-BLK", qty: 6, status: "Passed" },
-  { name: "Lux Cozi ONN", sku: "LX-UB21-WHT", qty: 6, status: "Rejected" },
-  { name: "Lux Winter -X", sku: "LX-RSX-GRY", qty: 6, status: "Passed" },
-  { name: "Lux Lyra", sku: "LX-LYR-BLK", qty: 6, status: "Pending" },
-];
-
-
-/* ── POPUP COMPONENTS ── */
+/* ─────────────────────────────────────────
+   ERROR POPUP
+───────────────────────────────────────── */
 const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items" }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-md overflow-hidden">
         <div className="bg-[#fff5f5] p-6 pb-5 flex items-start gap-4 border-b border-red-50">
           <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
             <AlertCircle className="text-red-600" size={24} strokeWidth={2.5} />
@@ -75,17 +116,19 @@ const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items"
   );
 };
 
-/* ── REUSABLE UI COMPONENTS ── */
+/* ─────────────────────────────────────────
+   REUSABLE UI
+───────────────────────────────────────── */
 const StatusPill = ({ status }) => {
   const styles = {
-    Passed: "text-emerald-600 bg-emerald-50 border-emerald-100",
+    Passed:   "text-emerald-600 bg-emerald-50 border-emerald-100",
     Rejected: "text-rose-600 bg-rose-50 border-rose-100",
-    Pending: "text-slate-500 bg-slate-50 border-slate-200"
+    Pending:  "text-slate-500 bg-slate-50 border-slate-200",
   };
   const icons = {
-    Passed: <CheckCircle2 size={14} strokeWidth={2.5} />,
+    Passed:   <CheckCircle2 size={14} strokeWidth={2.5} />,
     Rejected: <XCircle size={14} strokeWidth={2.5} />,
-    Pending: <Circle size={14} strokeWidth={2.5} className="opacity-50" />
+    Pending:  <Circle size={14} strokeWidth={2.5} className="opacity-50" />,
   };
   return (
     <span className={`text-xs font-semibold px-2 py-1 rounded-md border flex items-center gap-1.5 w-fit ${styles[status] || styles.Pending}`}>
@@ -105,7 +148,9 @@ const QRScanIcon = () => (
   </svg>
 );
 
-/* ── OPTIMIZED FTP CAMERA FEED COMPONENT ── */
+/* ─────────────────────────────────────────
+   FTP CAMERA FEED
+───────────────────────────────────────── */
 const FTPCameraFeed = () => {
   const [imageUrl, setImageUrl] = useState(null);
   const [error, setError] = useState(null);
@@ -115,24 +160,16 @@ const FTPCameraFeed = () => {
     const fetchLatestImage = async () => {
       try {
         const response = await fetch("http://localhost:8000/latest-image");
-        if (response.status === 404) {
-          setError("Waiting for first scan...");
-          return;
-        }
+        if (response.status === 404) { setError("Waiting for first scan..."); return; }
         if (response.ok) {
           const data = await response.json();
           if (data.upload_timestamp !== lastTimestamp) {
-            const newImageUrl = `http://localhost:8000${data.public_url}?t=${encodeURIComponent(data.upload_timestamp)}`;
-            setImageUrl(newImageUrl);
+            setImageUrl(`http://localhost:8000${data.public_url}?t=${encodeURIComponent(data.upload_timestamp)}`);
             setLastTimestamp(data.upload_timestamp);
             setError(null);
           }
-        } else {
-          setError("Camera feed offline");
-        }
-      } catch (err) {
-        setError("Cannot connect to Camera API");
-      }
+        } else { setError("Camera feed offline"); }
+      } catch { setError("Cannot connect to Camera API"); }
     };
     const interval = setInterval(fetchLatestImage, 1000);
     fetchLatestImage();
@@ -156,106 +193,157 @@ const FTPCameraFeed = () => {
   );
 };
 
-/* ── MAIN COMPONENT ── */
+/* ─────────────────────────────────────────
+   MAIN SCANNING COMPONENT
+───────────────────────────────────────── */
 const Scanning = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  
-  // 🟢 EXTRACT ORDER DATA FROM ROUTER
+
+  // ✅ Order data passed from DeliveryInfo
   const orderData = location.state?.orderData || null;
-  
-  // 🟢 CREATE PRODUCTS LIST DYNAMICALLY FROM ORDER DATA
+
+  // ✅ Build product list from order items
   const [products, setProducts] = useState([]);
   const [totalItemsCount, setTotalItemsCount] = useState(0);
 
   useEffect(() => {
-    if (orderData && orderData.items) {
+    if (orderData?.items) {
       let parsedItems = orderData.items;
-      if (typeof parsedItems === 'string') {
-        try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+      if (typeof parsedItems === "string") {
+        try { parsedItems = JSON.parse(parsedItems); } catch { parsedItems = []; }
       }
       if (!Array.isArray(parsedItems)) parsedItems = [];
-
       setTotalItemsCount(parsedItems.length);
-
-      // Map it to the format the scanner expects
-      const formatted = parsedItems.map(item => ({
+      setProducts(parsedItems.map((item) => ({
         name: item.name || "Unknown Item",
         sku: item.sku || "N/A",
         qty: item.qty || 0,
-        status: "Pending" // All start as Pending
-      }));
-      setProducts(formatted);
+        status: "Pending",
+      })));
     }
   }, [orderData]);
 
-
-  const [passed, setPassed] = useState(false);
+  // ─── Conveyor / scan state ───
+  const [passed, setPassed]     = useState(false);
   const [rejected, setRejected] = useState(false);
   const [plcError, setPlcError] = useState(null);
 
   const [isStackDropdownOpen, setIsStackDropdownOpen] = useState(false);
-  const [stackSize, setStackSize] = useState(6);
+  const [stackSize, setStackSize]   = useState(6);
   const [customAmount, setCustomAmount] = useState("");
-
-  const [scannedQRs, setScannedQRs] = useState([]);
   const stackOptions = [2, 4, 6, 8, 10, 20];
 
+  // ─── QR accumulation ───
+  // `currentBatchQRs`  → QRs scanned in the CURRENT live batch (from Python backend)
+  // `allScannedQRs`    → ALL QRs accumulated across ALL batches since page load
+  const [currentBatchQRs, setCurrentBatchQRs] = useState([]);
+  const [allScannedQRs, setAllScannedQRs]     = useState([]);
+
+  // ─── Error popup ───
   const [showErrorPopup, setShowErrorPopup] = useState(false);
-  const [validationStatus, setValidationStatus] = useState("waiting");
+  const [mismatchMsg, setMismatchMsg] = useState("");
 
-  // Helper function to clear Python's memory
-  const clearBackendQueue = async () => {
-    try {
-      await fetch("http://localhost:5000/api/qr", { method: 'DELETE' });
-    } catch (e) {
-      console.error("Failed to clear backend queue", e);
-    }
-    setScannedQRs([]);
-  };
+  // ─── Sync modal ───
+  const [showSyncModal, setShowSyncModal] = useState(false);
+  const [isSyncing, setIsSyncing]         = useState(false);
 
-  // QR Fetch Polling
+  /* ── Poll Python backend for live QR codes ── */
+  /* Auto-stops belt and accumulates when batch hits stackSize exactly.
+     Stops immediately and shows error if count exceeds stackSize.      */
+  const isBeltRunning = useRef(false);
+  const isProcessingBatch = useRef(false);
+  const syncedQRsRef = useRef(new Set()); // tracks all QRs ever queued to detect duplicates // prevents double-fire during clearBackendQueue delay
+  const stackSizeRef = useRef(stackSize);  // always-current stackSize inside interval
+
+  // Sync stackSizeRef AND push to Flask on every change AND on first mount
+  useEffect(() => {
+    stackSizeRef.current = stackSize;
+    fetch("http://localhost:5000/api/stack-size", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ stack_size: stackSize }),
+    }).catch(() => {});
+  }, [stackSize]); // runs on mount (initial value) and every time user changes dropdown
+
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const response = await fetch("http://localhost:5000/api/qr");
         const data = await response.json();
-        if (data.qr_codes) {
-          setScannedQRs(data.qr_codes);
-        }
-      } catch (error) { }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+        if (!data.qr_codes) return;
 
-  // Sync stackSize to backend whenever operator changes it
-  useEffect(() => {
-    fetch("http://localhost:5000/api/payload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ box_count: stackSize }),
-    }).catch(() => { });
-  }, [stackSize]);
+        const incoming = data.qr_codes;
+        setCurrentBatchQRs(incoming);
 
-  // Poll validation status
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const response = await fetch("http://localhost:5000/api/validation-status");
-        const data = await response.json();
-        setValidationStatus(data.status);
+        // Skip if we're mid-processing a batch state change
+        if (isProcessingBatch.current) return;
 
-        // Auto-show error popup on mismatch
-        if (data.status === "mismatch") {
-          setRejected(true);
-          setPassed(false);
+        if (data.error) {
+          isProcessingBatch.current = true;
+          isBeltRunning.current = false;
+          const got      = data.qr_codes?.length ?? 0;
+          const expected = stackSizeRef.current;
+          const missing  = data.missing ?? Math.max(0, expected - got);
+          const extra    = data.extra   ?? Math.max(0, got - expected);
+          const msg = missing > 0
+            ? `${missing} box(es) missing! Got ${got}, expected ${expected}.`
+            : `${extra} extra box(es)! Got ${got}, expected ${expected}.`;
+          setMismatchMsg(msg);
           setShowErrorPopup(true);
+          toast.error(msg);
+          clearBackendQueue().then(() => {
+            isProcessingBatch.current = false;
+          });
+          return;
         }
-      } catch (error) { }
-    }, 1000);
+
+        if (data.complete === true && incoming.length > 0) {
+          isProcessingBatch.current = true;
+
+          // Check for duplicates using a ref (safe outside state updater)
+          const hasDuplicate = incoming.some((qr) => syncedQRsRef.current.has(qr));
+
+          if (hasDuplicate) {
+            // Stop belt immediately
+            fetch("http://localhost:5000/api/conveyor", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ command: 1 }),
+            }).catch(() => {});
+            setMismatchMsg("Duplicate QR(s) detected! This stack was already scanned. Belt stopped.");
+            setShowErrorPopup(true);
+            toast.error("Duplicate QR(s) detected! Stack rejected.");
+            clearBackendQueue().then(() => { isProcessingBatch.current = false; });
+          } else {
+            // Add all to the ref set and to state
+            incoming.forEach((qr) => syncedQRsRef.current.add(qr));
+            setAllScannedQRs((prev) => [...prev, ...incoming]);
+            toast.success(`✓ Stack of ${incoming.length} queued — belt continuing.`);
+            clearBackendQueue().then(() => { isProcessingBatch.current = false; });
+          }
+          return;
+        }
+
+        // Live count update — no action, just display
+      } catch {}
+    }, 200);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ── Clear backend queue only (not our accumulated list) ── */
+  const clearBackendQueue = async () => {
+    try {
+      await fetch("http://localhost:5000/api/qr", { method: "DELETE" });
+    } catch (e) {
+      console.error("Failed to clear backend queue", e);
+    }
+    setCurrentBatchQRs([]); // reset live display
+  };
+
+  /* ── Conveyor control ── */
+  // command: 0 = start, 1 = stop
   const controlConveyor = async (command) => {
     try {
       setPlcError(null);
@@ -265,52 +353,115 @@ const Scanning = () => {
         body: JSON.stringify({ command }),
       });
       const data = await response.json();
-      if (!data.success) {
+      if (data.success) {
+        isBeltRunning.current = command === 0; // 0=start → running, 1=stop → not running
+      } else {
         setPlcError("Failed to communicate with PLC");
       }
-    } catch (error) {
+    } catch {
       setPlcError("Make sure Python server is running");
     }
   };
 
-  // Custom Stop Handler
+  /* ── Manual Stop button ──
+     Never accumulates QRs directly.
+     - If batch is incomplete → error popup, discard batch
+     - If batch already auto-completed → belt already stopped, this is a no-op safety press
+     - If 0 QRs scanned → just stop the belt silently                                       */
   const handleStopConveyor = () => {
     setPassed(false);
     setRejected(false);
+    isBeltRunning.current = false; // mark stopped immediately so polling doesn't double-fire
     controlConveyor(1);
-    if (scannedQRs.length > 0 && scannedQRs.length < stackSize) {
-      setShowErrorPopup(true); // Alert of missing items
+
+    if (currentBatchQRs.length > 0 && currentBatchQRs.length < stackSize) {
+      // Incomplete batch — discard, show error, force rescan
+      setShowErrorPopup(true);
+      // Do NOT accumulate — these QRs are discarded
+    }
+    // If currentBatchQRs.length === 0: silent stop (belt was idle)
+    // If currentBatchQRs.length === stackSize: auto-accumulate already handled it in polling
+  };
+
+  /* ── Rescan: clear current batch, restart belt ── */
+  const handleRescan = () => {
+    setShowErrorPopup(false);
+    clearBackendQueue();
+    controlConveyor(0);
+  };
+
+  /* ── Sync: POST all accumulated QRs to the inward API ── */
+  const handleSync = async () => {
+    if (allScannedQRs.length === 0) {
+      toast.error("No QR codes to sync. Scan some items first.");
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      const token = localStorage.getItem("token");
+      const payload = [
+        {
+          po_code:        orderData?.order_code || "",
+          supplier_code:  orderData?.supplier_code || "",
+          warehouse_code: orderData?.plant_code || "",
+          product_qrs:    allScannedQRs,
+        },
+      ];
+
+      const res = await axios.post(
+        "http://wmsbeta.luxkutumb.info/api/sap/inward",
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      console.log("Sync API raw response:", res.status, res.data);
+
+      // API returns status: true (boolean) on success
+      const isSuccess = res.data.status === true;
+
+      if (isSuccess) {
+        const syncedCount = allScannedQRs.length;
+        setAllScannedQRs([]);
+        syncedQRsRef.current.clear(); // reset duplicate tracker after sync
+        setShowSyncModal(false);
+        toast.success("Synced " + syncedCount + " QR(s) — " + (res.data.message || "accepted"));
+      } else {
+        toast.error(res.data.message || res.data.error || "Sync failed. Please try again.");
+      }
+    } catch (err) {
+      console.error("Sync error:", err);
+      toast.error("Network error during sync.");
+    } finally {
+      setIsSyncing(false);
     }
   };
 
-  // Rescan Handler (Clears Python memory)
-  const handleRescan = () => {
-    setShowErrorPopup(false);
-    setValidationStatus("waiting");
-    clearBackendQueue();
-    controlConveyor(0); // Restart belt
-  };
+  // ── Display values ──
+  const totalScannedSoFar = allScannedQRs.length + currentBatchQRs.length;
+  const latestQR = currentBatchQRs.length > 0 ? currentBatchQRs[currentBatchQRs.length - 1] : null;
 
   return (
     <Layout>
       <div className="max-w-7xl mx-auto flex flex-col gap-6 pb-10">
-        <header className="bg-white rounded-2xl border border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between shadow-sm">
+
+        {/* ─── HEADER ─── */}
+        <header className="bg-white rounded-2xl border border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between shadow-sm gap-4">
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-200 text-slate-600 shadow-sm">
                 <Layers size={22} strokeWidth={1.5} />
               </div>
               <div>
-                {/* 🟢 DYNAMIC BATCH/ORDER INFO */}
                 <h1 className="text-base font-bold text-slate-900 tracking-tight">
                   {orderData ? `PO-${orderData.order_code}` : "Unknown Order"}
                 </h1>
                 <p className="text-sm text-slate-500 font-medium mt-0.5">
-                  Processing item {scannedQRs.length} of {totalItemsCount}
+                  {allScannedQRs.length} synced · {currentBatchQRs.length} in current batch
                 </p>
               </div>
             </div>
 
+            {/* Stack size selector */}
             <div className="relative ml-2">
               <button onClick={() => setIsStackDropdownOpen(!isStackDropdownOpen)} className="flex items-center gap-3 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all">
                 <div className="flex flex-col text-left">
@@ -338,7 +489,12 @@ const Scanning = () => {
                   <div className="border-t border-slate-100 p-4 bg-slate-50/50">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Custom Amount</label>
                     <div className="relative flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                      <input type="number" placeholder="Qty..." value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && customAmount) { setStackSize(parseInt(customAmount, 10)); setIsStackDropdownOpen(false); setCustomAmount(""); } }} className="w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none" />
+                      <input
+                        type="number" placeholder="Qty..." value={customAmount}
+                        onChange={(e) => setCustomAmount(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && customAmount) { setStackSize(parseInt(customAmount, 10)); setIsStackDropdownOpen(false); setCustomAmount(""); }}}
+                        className="w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none"
+                      />
                       <div className="absolute right-1.5 top-1/2 -translate-y-1/2"><span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded">PCS</span></div>
                     </div>
                   </div>
@@ -347,28 +503,53 @@ const Scanning = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-6">
-            {plcError && <span className="text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2"><AlertTriangle size={14} /> {plcError}</span>}
+          {/* Right side: stats + sync button */}
+          <div className="flex items-center gap-4">
+            {plcError && (
+              <span className="text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2">
+                <AlertTriangle size={14} /> {plcError}
+              </span>
+            )}
 
             <div className="flex items-center gap-3">
               <span className="text-2xl font-bold text-slate-900 leading-none">{totalItemsCount}</span>
               <span className="w-px h-8 bg-slate-200 mx-1" />
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br/>Items</span>
             </div>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
-              <span className="text-2xl font-bold text-slate-900 leading-none">{Math.max(0, totalItemsCount - scannedQRs.length)}</span>
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+              <span className="text-2xl font-bold text-indigo-600 leading-none">{allScannedQRs.length}</span>
               <span className="w-px h-8 bg-slate-200 mx-1" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Items<br/>Remain</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">QRs<br/>Queued</span>
             </div>
 
-            <div className="flex items-center gap-3"><span className="text-2xl font-bold text-slate-900 leading-none">100</span><span className="w-px h-8 bg-slate-200 mx-1" /><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br />Boxes</span></div>
-            <div className="flex items-center gap-3 border-l border-slate-200 pl-6"><span className="text-2xl font-bold text-slate-900 leading-none">200</span><span className="w-px h-8 bg-slate-200 mx-1" /><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Boxes<br />Remain</span></div>
-
+            {/* ✅ SYNC BUTTON */}
+            <button
+              onClick={() => {
+                if (allScannedQRs.length === 0) {
+                  toast.error("No QR codes queued. Stop the conveyor after scanning a full batch first.");
+                  return;
+                }
+                setShowSyncModal(true);
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${
+                allScannedQRs.length > 0
+                  ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed"
+              }`}
+            >
+              <Upload size={15} />
+              Sync ({allScannedQRs.length})
+            </button>
           </div>
         </header>
 
+        {/* ─── BODY ─── */}
         <div className="flex items-start gap-6">
+
+          {/* LEFT COLUMN */}
           <div className="flex-[0.9] flex flex-col gap-6">
+
+            {/* Checklist */}
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
                 <div className="flex items-center gap-3 text-indigo-600"><ClipboardList size={20} /><h2 className="text-sm font-bold tracking-tight text-slate-900 uppercase">Inspection Protocol: Level 2</h2></div>
@@ -384,12 +565,13 @@ const Scanning = () => {
               </div>
             </section>
 
+            {/* Product list */}
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
                 <h2 className="text-sm font-bold text-slate-900 uppercase">Product Scan</h2>
-                <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">{scannedQRs.length}/{stackSize} Scanned</span>
+                <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">{currentBatchQRs.length}/{stackSize} in batch</span>
               </div>
-              <div className="divide-y divide-slate-100 overflow-y-auto custom-scrollbar flex-1">
+              <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
                 {products.length > 0 ? (
                   products.map((p, i) => (
                     <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
@@ -404,43 +586,152 @@ const Scanning = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="p-8 text-center text-slate-500 text-sm font-medium">
-                    No items found for this order.
-                  </div>
+                  <div className="p-8 text-center text-slate-500 text-sm font-medium">No items found for this order.</div>
                 )}
               </div>
             </section>
           </div>
 
+          {/* RIGHT COLUMN */}
           <div className="flex-[1.2] flex flex-col gap-6">
+
+            {/* Camera + controls */}
             <section className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex flex-col">
               <div className="flex gap-6">
                 <div className="flex flex-col w-[35%] shrink-0">
-                  <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-bold px-2.5 py-1.5 rounded-lg w-fit mb-5 tracking-widest shadow-sm uppercase"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />Live Camera</div>
+                  <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 text-rose-600 text-[10px] font-bold px-2.5 py-1.5 rounded-lg w-fit mb-5 tracking-widest shadow-sm uppercase">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />Live Camera
+                  </div>
                   <div className="flex flex-col gap-3">
-                    <button onClick={() => controlConveyor(0)} className="w-full flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 text-sm font-bold py-3 rounded-xl transition-all uppercase cursor-pointer"><Play size={16} fill="currentColor" />Start</button>
-                    <button onClick={handleStopConveyor} className="w-full flex items-center justify-center gap-2 bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 text-sm font-bold py-3 rounded-xl transition-all uppercase"><div className="w-3 h-3 bg-rose-600 rounded-[3px]" />Stop</button>
+                    <button
+                      onClick={() => {
+                        isProcessingBatch.current = false; // reset in case of stale lock
+                        clearBackendQueue();
+                        controlConveyor(0);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-50 text-indigo-700 border border-indigo-100 hover:bg-indigo-100 text-sm font-bold py-3 rounded-xl transition-all uppercase cursor-pointer"
+                    >
+                      <Play size={16} fill="currentColor" />Start
+                    </button>
+                    <button
+                      onClick={handleStopConveyor}
+                      className="w-full flex items-center justify-center gap-2 bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 text-sm font-bold py-3 rounded-xl transition-all uppercase"
+                    >
+                      <div className="w-3 h-3 bg-rose-600 rounded-[3px]" />Stop
+                    </button>
                     <div className="flex gap-3 mt-2">
                       <button onClick={() => { setRejected((r) => !r); setPassed(false); }} className={`w-full flex flex-col items-center justify-center gap-1.5 text-xs font-bold py-3 rounded-xl transition-all border uppercase ${rejected ? "bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-600/20" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}><Ban size={18} strokeWidth={2.5} />Reject</button>
                       <button onClick={() => { setPassed((p) => !p); setRejected(false); }} className={`w-full flex flex-col items-center justify-center gap-1.5 text-xs font-bold py-3 rounded-xl transition-all border uppercase ${passed ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20" : "bg-white border-slate-200 text-emerald-600 hover:bg-emerald-50"}`}><CheckCircle size={18} strokeWidth={2.5} />Pass</button>
                     </div>
                   </div>
                 </div>
-                <div className="flex-1 relative aspect-square max-h-[250px] w-full bg-[#0f172a] rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center group"><FTPCameraFeed /><div className="absolute inset-0 opacity-10 pointer-events-none z-10" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '16px 16px' }} /><div className="absolute top-5 left-5 w-6 h-6 border-t-2 border-l-2 border-amber-400 rounded-tl opacity-90 z-20" /><div className="absolute top-5 right-5 w-6 h-6 border-t-2 border-r-2 border-amber-400 rounded-tr opacity-90 z-20" /><div className="absolute bottom-5 left-5 w-6 h-6 border-b-2 border-l-2 border-amber-400 rounded-bl opacity-90 z-20" /><div className="absolute bottom-5 right-5 w-6 h-6 border-b-2 border-r-2 border-amber-400 rounded-br opacity-90 z-20" /><div className="absolute left-0 right-0 top-1/2 h-[2px] bg-rose-500 z-30 opacity-80 shadow-[0_0_20px_4px_rgba(244,63,94,0.6)] animate-[pulse_2s_ease-in-out_infinite]" /></div>
+
+                {/* Camera view */}
+                <div className="flex-1 relative aspect-square max-h-[250px] w-full bg-[#0f172a] rounded-2xl overflow-hidden shadow-inner border border-slate-800 flex items-center justify-center group">
+                  <FTPCameraFeed />
+                  <div className="absolute inset-0 opacity-10 pointer-events-none z-10" style={{ backgroundImage: "radial-gradient(#94a3b8 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+                  <div className="absolute top-5 left-5 w-6 h-6 border-t-2 border-l-2 border-amber-400 rounded-tl opacity-90 z-20" />
+                  <div className="absolute top-5 right-5 w-6 h-6 border-t-2 border-r-2 border-amber-400 rounded-tr opacity-90 z-20" />
+                  <div className="absolute bottom-5 left-5 w-6 h-6 border-b-2 border-l-2 border-amber-400 rounded-bl opacity-90 z-20" />
+                  <div className="absolute bottom-5 right-5 w-6 h-6 border-b-2 border-r-2 border-amber-400 rounded-br opacity-90 z-20" />
+                  <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-rose-500 z-30 opacity-80 shadow-[0_0_20px_4px_rgba(244,63,94,0.6)] animate-[pulse_2s_ease-in-out_infinite]" />
+                </div>
               </div>
+
+              {/* Detected object footer */}
               <div className="flex flex-row items-end justify-between mt-6 pt-6 border-t border-slate-100">
-                <div><p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5 uppercase">Detected Object</p><p className="text-slate-900 text-lg font-bold leading-tight mb-2 tracking-tight uppercase">Adidas Ultraboost 21</p><div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md w-fit"><QRScanIcon /><span className="text-emerald-600 text-xs font-bold tracking-wide uppercase">{scannedQRs.length > 0 ? scannedQRs[0] : "Waiting..."}</span></div></div>
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-center shadow-sm"><p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1 tracking-tight">Items in Stack</p><p className="text-slate-900 text-lg font-bold tracking-tight">{scannedQRs.length} / {stackSize}</p><span className={`text-[10px] font-bold mt-1 inline-block px-2 py-0.5 rounded-full ${validationStatus === "ok" ? "bg-emerald-50 text-emerald-600" : validationStatus === "mismatch" ? "bg-rose-50 text-rose-600" : "bg-slate-100 text-slate-400"}`}>{validationStatus === "ok" ? "✅ Passed" : validationStatus === "mismatch" ? "🛑 Mismatch" : "⏳ Scanning..."}</span></div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5">Detected Object</p>
+                  <p className="text-slate-900 text-lg font-bold leading-tight mb-2 tracking-tight uppercase">
+                    {products.length > 0 ? products[0].name : "—"}
+                  </p>
+                  <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md w-fit">
+                    <QRScanIcon />
+                    <span className="text-emerald-600 text-xs font-bold tracking-wide uppercase">
+                      {latestQR || "Waiting..."}
+                    </span>
+                  </div>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-center shadow-sm">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1">Items in Stack</p>
+                  <p className="text-slate-900 text-lg font-bold tracking-tight">{currentBatchQRs.length} / {stackSize}</p>
+                </div>
               </div>
             </section>
+
+            {/* ─── LIVE SCANNER LOG — shows ALL accumulated + current batch ─── */}
             <section className="w-full bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between mb-4"><p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-2.5 shrink-0 uppercase tracking-tight"><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />Live Scanner Log</p></div>
-              <div className="bg-slate-900 rounded-xl p-4 font-mono flex-1 overflow-y-auto max-h-[160px] shadow-inner border border-slate-800 custom-scrollbar">{scannedQRs.length === 0 ? (<p className="text-slate-500 text-sm font-medium flex items-center gap-2 uppercase tracking-tight"><span className="animate-pulse">_</span> Waiting for payload...</p>) : (<div className="flex flex-col gap-2">{scannedQRs.map((code, index) => (<div key={index} className="flex items-start gap-3 border-b border-slate-800 pb-2 last:border-0 last:pb-0 uppercase tracking-tight leading-tight text-xs font-medium"><span className="text-slate-600 text-xs font-bold min-w-[20px] pt-0.5 uppercase">{(scannedQRs.length - index).toString().padStart(2, '0')}.</span><span className="text-emerald-400 text-sm font-medium tracking-wide break-all uppercase tracking-tight leading-tight text-xs font-medium">{code}</span></div>))}</div>)}</div>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-2.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                  Live Scanner Log
+                </p>
+                <div className="flex items-center gap-3">
+                  {/* Queue badge */}
+                  {allScannedQRs.length > 0 && (
+                    <span className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold px-2.5 py-1 rounded-md uppercase tracking-wide">
+                      {allScannedQRs.length} queued for sync
+                    </span>
+                  )}
+                  {/* Clear queue button */}
+                  {allScannedQRs.length > 0 && (
+                    <button
+                      onClick={() => { setAllScannedQRs([]); toast("Queue cleared.", { icon: "🗑️" }); }}
+                      className="text-[10px] border border-rose-100 bg-rose-50 text-rose-600 font-bold px-2.5 py-1 rounded-md uppercase tracking-wide hover:bg-rose-100 transition-colors flex items-center gap-1.5"
+                    >
+                      <XCircle size={11} /> Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-slate-900 rounded-xl p-4 font-mono flex-1 overflow-y-auto max-h-[200px] shadow-inner border border-slate-800">
+                {allScannedQRs.length === 0 && currentBatchQRs.length === 0 ? (
+                  <p className="text-slate-500 text-sm font-medium flex items-center gap-2 uppercase tracking-tight">
+                    <span className="animate-pulse">_</span> Waiting for payload...
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {/* Current batch (live, not yet committed) */}
+                    {currentBatchQRs.map((code, index) => (
+                      <div key={`live-${index}`} className="flex items-start gap-3 border-b border-slate-800 pb-2 last:border-0 last:pb-0">
+                        <span className="text-amber-400 text-[10px] font-bold min-w-[36px] pt-0.5 uppercase shrink-0">LIVE</span>
+                        <span className="text-amber-300 text-xs font-medium tracking-wide break-all">{code}</span>
+                      </div>
+                    ))}
+                    {/* Accumulated / synced queue */}
+                    {[...allScannedQRs].reverse().map((code, index) => (
+                      <div key={`acc-${index}`} className="flex items-start gap-3 border-b border-slate-800 pb-2 last:border-0 last:pb-0">
+                        <span className="text-slate-600 text-[10px] font-bold min-w-[36px] pt-0.5 uppercase shrink-0">{(allScannedQRs.length - index).toString().padStart(2, "0")}.</span>
+                        <span className="text-emerald-400 text-xs font-medium tracking-wide break-all">{code}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
           </div>
         </div>
       </div>
-      <ErrorPopup isOpen={showErrorPopup} onDismiss={() => setShowErrorPopup(false)} onRescan={handleRescan} missingCode={`${stackSize - scannedQRs.length} Item(s) Missing`} />
+
+      {/* ─── MODALS ─── */}
+      <ErrorPopup
+        isOpen={showErrorPopup}
+        onDismiss={() => {
+          setShowErrorPopup(false);
+          clearBackendQueue();
+        }}
+        onRescan={handleRescan}
+        missingCode={mismatchMsg || `${stackSize - currentBatchQRs.length} Item(s) Missing (${currentBatchQRs.length}/${stackSize} scanned)`}
+      />
+      <SyncModal
+        isOpen={showSyncModal}
+        onClose={() => setShowSyncModal(false)}
+        onConfirm={handleSync}
+        totalQRs={allScannedQRs.length}
+        orderCode={orderData ? `PO-${orderData.order_code}` : "Unknown"}
+        isSyncing={isSyncing}
+      />
     </Layout>
   );
 };
