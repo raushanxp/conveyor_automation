@@ -18,6 +18,10 @@ scanned_qr_codes = []
 # Expected number of boxes the worker will place on the conveyor
 expected_box_count = 0
 
+# ── Validation state ──
+validation_status = "waiting"   # "waiting" | "ok" | "mismatch"
+last_detected_count = 0
+
 def connect_to_plc():
     """Establish a persistent connection to the PLC"""
     global plc_socket
@@ -49,6 +53,33 @@ def create_modbus_packet(value: int, unit_id=1):
     register_addr = 0
     packet = struct.pack('>HHHBBHH', transaction_id, protocol_id, length, unit_id, function_code, register_addr, value)
     return packet
+
+# ── Send PLC signal (uses persistent socket with auto-retry) ──
+def send_plc_signal(value: int):
+    """Sends 0 or 1 to PLC register 40001 using the same persistent socket as Start/Stop."""
+    global plc_socket
+    for attempt in range(2):
+        if not plc_socket:
+            if not connect_to_plc():
+                print(f"❌ PLC Signal Failed: Cannot connect to PLC")
+                return
+        try:
+            packet = create_modbus_packet(value)
+            plc_socket.sendall(packet)
+            plc_socket.recv(1024)
+            print(f"📡 PLC Signal Sent: {value} → Register 40001")
+            return
+        except Exception as e:
+            print(f"⚠️ PLC signal attempt {attempt + 1} failed: {e}")
+            if plc_socket:
+                try:
+                    plc_socket.close()
+                except:
+                    pass
+            plc_socket = None
+            time.sleep(0.1)
+    print(f"❌ PLC Signal Failed after 2 attempts")
+
 
 # ── ROUTE 1: PLC CONVEYOR CONTROL (WITH AUTO-RETRY) ──
 @app.route('/api/conveyor', methods=['POST', 'OPTIONS'])
@@ -97,37 +128,54 @@ def control_conveyor():
 # ── ROUTE 2: QR CODE SCANNER BRIDGE ──
 @app.route('/api/qr', methods=['GET', 'POST', 'DELETE'])
 def handle_qr():
-    global scanned_qr_codes
+    global scanned_qr_codes, validation_status, last_detected_count
     
-    # NEW: When React sends a DELETE request, wipe the list
+    # When React sends a DELETE request, wipe the list and reset validation
     if request.method == 'DELETE':
         scanned_qr_codes.clear()
+        validation_status = "waiting"
+        last_detected_count = 0
         print("🧹 QR Queue cleared by React")
         return jsonify({"success": True, "message": "Queue cleared"})
         
     elif request.method == 'POST':
         data = request.json
         
+        # Clear previous scan — each camera trigger is a fresh batch
+        scanned_qr_codes.clear()
+        
         # Handle a single code (fallback)
         if data and 'qr_code' in data:
             new_code = data['qr_code']
-            scanned_qr_codes.insert(0, new_code)
+            scanned_qr_codes.append(new_code)
             print(f"📷 New QR Scanned: {new_code}")
             
         # Handle a batch array of codes from tcp_client.py
         if data and 'qr_codes' in data:
-            # Reverse the batch so they show up in the correct chronological order in the UI
-            for code in reversed(data['qr_codes']):
-                scanned_qr_codes.insert(0, code)
+            scanned_qr_codes.extend(data['qr_codes'])
             print(f"📷 Batch of {len(data['qr_codes'])} QRs Scanned")
-            
-        # INCREASED LIMIT: Keep up to 500 items so the array doesn't stop at 50 anymore!
-        scanned_qr_codes = scanned_qr_codes[:500]
+
+        # Filter out NoRead signals (safety net — tcp_client also filters)
+        scanned_qr_codes = [c for c in scanned_qr_codes if c.strip().lower() != "noread"]
+
+        # ── Instant Validation ──
+        if expected_box_count > 0:
+            detected = len(scanned_qr_codes)
+            last_detected_count = detected
+            if detected == expected_box_count:
+                validation_status = "ok"
+                print(f"✅ STACK OK — {detected}/{expected_box_count}")
+            else:
+                validation_status = "mismatch"
+                if detected < expected_box_count:
+                    print(f"🛑 MISMATCH — {expected_box_count - detected} box(es) MISSING ({detected}/{expected_box_count})")
+                else:
+                    print(f"🛑 MISMATCH — {detected - expected_box_count} EXTRA box(es) ({detected}/{expected_box_count})")
+                send_plc_signal(1)  # Stop conveyor immediately
         
         return jsonify({"success": True})
         
     elif request.method == 'GET':
-        # Return the entire list to React
         return jsonify({"qr_codes": scanned_qr_codes})
 
 # ── ROUTE 3: PAYLOAD — SET/GET EXPECTED BOX COUNT ──
@@ -153,7 +201,16 @@ def handle_payload():
             "match": len(scanned_qr_codes) == expected_box_count
         })
 
+# ── ROUTE 4: VALIDATION STATUS ──
+@app.route('/api/validation-status', methods=['GET'])
+def get_validation_status():
+    return jsonify({
+        "status": validation_status,
+        "detected": last_detected_count,
+        "expected": expected_box_count
+    })
+
+
 if __name__ == "__main__":
-    # Pointing to 0.0.0.0 allows React to connect via your network IP
     print("🚀 Python PLC Bridge running on port 5000")
     app.run(host='0.0.0.0', port=5000)

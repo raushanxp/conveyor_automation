@@ -29,7 +29,7 @@ PLC_PORT = 502
 EXPECTED_BOX_COUNT = 6
 
 # Quiet period (seconds) — if no QR arrives for this long, batch is considered done
-QUIET_TIMEOUT = 3.0
+QUIET_TIMEOUT = 0.0
 
 
 # =====================================================================

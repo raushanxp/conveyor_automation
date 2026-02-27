@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { 
-  Play, 
-  CheckCircle, 
-  ChevronDown, 
-  Ban, 
-  ClipboardList, 
-  Circle, 
-  AlertTriangle, 
-  XCircle, 
+import {
+  Play,
+  CheckCircle,
+  ChevronDown,
+  Ban,
+  ClipboardList,
+  Circle,
+  AlertTriangle,
+  XCircle,
   CheckCircle2,
   Check,
   Camera,
@@ -22,12 +22,21 @@ import { useLocation, useNavigate } from "react-router-dom"; // 🟢 ADDED FOR R
 
 /* ── MOCK DATA ── */
 const checklistItems = [
-  { label: "Verify Package Integrity",       done: true  },
-  { label: "Confirm Label Accuracy",         done: false },
+  { label: "Verify Package Integrity", done: true },
+  { label: "Confirm Label Accuracy", done: false },
   { label: "Weight Check (Expected: 2.5kg)", done: false },
-  { label: "Seal Inspection",                done: false },
-  { label: "Barcode Readability",            done: false },
+  { label: "Seal Inspection", done: false },
+  { label: "Barcode Readability", done: false },
 ];
+
+
+const products = [
+  { name: "Lux Cozi", sku: "LX-AM90-BLK", qty: 6, status: "Passed" },
+  { name: "Lux Cozi ONN", sku: "LX-UB21-WHT", qty: 6, status: "Rejected" },
+  { name: "Lux Winter -X", sku: "LX-RSX-GRY", qty: 6, status: "Passed" },
+  { name: "Lux Lyra", sku: "LX-LYR-BLK", qty: 6, status: "Pending" },
+];
+
 
 /* ── POPUP COMPONENTS ── */
 const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items" }) => {
@@ -126,7 +135,7 @@ const FTPCameraFeed = () => {
       }
     };
     const interval = setInterval(fetchLatestImage, 1000);
-    fetchLatestImage(); 
+    fetchLatestImage();
     return () => clearInterval(interval);
   }, [lastTimestamp]);
 
@@ -184,15 +193,16 @@ const Scanning = () => {
   const [passed, setPassed] = useState(false);
   const [rejected, setRejected] = useState(false);
   const [plcError, setPlcError] = useState(null);
-  
+
   const [isStackDropdownOpen, setIsStackDropdownOpen] = useState(false);
-  const [stackSize, setStackSize] = useState(6); 
+  const [stackSize, setStackSize] = useState(6);
   const [customAmount, setCustomAmount] = useState("");
-  
+
   const [scannedQRs, setScannedQRs] = useState([]);
   const stackOptions = [2, 4, 6, 8, 10, 20];
 
   const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [validationStatus, setValidationStatus] = useState("waiting");
 
   // Helper function to clear Python's memory
   const clearBackendQueue = async () => {
@@ -201,7 +211,7 @@ const Scanning = () => {
     } catch (e) {
       console.error("Failed to clear backend queue", e);
     }
-    setScannedQRs([]); 
+    setScannedQRs([]);
   };
 
   // QR Fetch Polling
@@ -213,7 +223,35 @@ const Scanning = () => {
         if (data.qr_codes) {
           setScannedQRs(data.qr_codes);
         }
-      } catch (error) {}
+      } catch (error) { }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sync stackSize to backend whenever operator changes it
+  useEffect(() => {
+    fetch("http://localhost:5000/api/payload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ box_count: stackSize }),
+    }).catch(() => { });
+  }, [stackSize]);
+
+  // Poll validation status
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch("http://localhost:5000/api/validation-status");
+        const data = await response.json();
+        setValidationStatus(data.status);
+
+        // Auto-show error popup on mismatch
+        if (data.status === "mismatch") {
+          setRejected(true);
+          setPassed(false);
+          setShowErrorPopup(true);
+        }
+      } catch (error) { }
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -248,6 +286,7 @@ const Scanning = () => {
   // Rescan Handler (Clears Python memory)
   const handleRescan = () => {
     setShowErrorPopup(false);
+    setValidationStatus("waiting");
     clearBackendQueue();
     controlConveyor(0); // Restart belt
   };
@@ -271,7 +310,7 @@ const Scanning = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="relative ml-2">
               <button onClick={() => setIsStackDropdownOpen(!isStackDropdownOpen)} className="flex items-center gap-3 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all">
                 <div className="flex flex-col text-left">
@@ -299,7 +338,7 @@ const Scanning = () => {
                   <div className="border-t border-slate-100 p-4 bg-slate-50/50">
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Custom Amount</label>
                     <div className="relative flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                      <input type="number" placeholder="Qty..." value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && customAmount) { setStackSize(parseInt(customAmount, 10)); setIsStackDropdownOpen(false); setCustomAmount(""); }}} className="w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none" />
+                      <input type="number" placeholder="Qty..." value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && customAmount) { setStackSize(parseInt(customAmount, 10)); setIsStackDropdownOpen(false); setCustomAmount(""); } }} className="w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none" />
                       <div className="absolute right-1.5 top-1/2 -translate-y-1/2"><span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded">PCS</span></div>
                     </div>
                   </div>
@@ -307,9 +346,10 @@ const Scanning = () => {
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-6">
             {plcError && <span className="text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2"><AlertTriangle size={14} /> {plcError}</span>}
+
             <div className="flex items-center gap-3">
               <span className="text-2xl font-bold text-slate-900 leading-none">{totalItemsCount}</span>
               <span className="w-px h-8 bg-slate-200 mx-1" />
@@ -320,6 +360,10 @@ const Scanning = () => {
               <span className="w-px h-8 bg-slate-200 mx-1" />
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Items<br/>Remain</span>
             </div>
+
+            <div className="flex items-center gap-3"><span className="text-2xl font-bold text-slate-900 leading-none">100</span><span className="w-px h-8 bg-slate-200 mx-1" /><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br />Boxes</span></div>
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-6"><span className="text-2xl font-bold text-slate-900 leading-none">200</span><span className="w-px h-8 bg-slate-200 mx-1" /><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Boxes<br />Remain</span></div>
+
           </div>
         </header>
 
@@ -386,7 +430,7 @@ const Scanning = () => {
               </div>
               <div className="flex flex-row items-end justify-between mt-6 pt-6 border-t border-slate-100">
                 <div><p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mb-1.5 uppercase">Detected Object</p><p className="text-slate-900 text-lg font-bold leading-tight mb-2 tracking-tight uppercase">Adidas Ultraboost 21</p><div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md w-fit"><QRScanIcon /><span className="text-emerald-600 text-xs font-bold tracking-wide uppercase">{scannedQRs.length > 0 ? scannedQRs[0] : "Waiting..."}</span></div></div>
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-center shadow-sm"><p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1 uppercase tracking-tight">Items in Stack</p><p className="text-slate-900 text-lg font-bold tracking-tight">{scannedQRs.length} / {stackSize}</p></div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-5 py-3.5 text-center shadow-sm"><p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-1 tracking-tight">Items in Stack</p><p className="text-slate-900 text-lg font-bold tracking-tight">{scannedQRs.length} / {stackSize}</p><span className={`text-[10px] font-bold mt-1 inline-block px-2 py-0.5 rounded-full ${validationStatus === "ok" ? "bg-emerald-50 text-emerald-600" : validationStatus === "mismatch" ? "bg-rose-50 text-rose-600" : "bg-slate-100 text-slate-400"}`}>{validationStatus === "ok" ? "✅ Passed" : validationStatus === "mismatch" ? "🛑 Mismatch" : "⏳ Scanning..."}</span></div>
               </div>
             </section>
             <section className="w-full bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
