@@ -1,36 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Printer } from "lucide-react";
 import Layout from "../components/Layout";
 import { Link } from "react-router-dom";
-
-/* ── Dummy Data ── */
-const deliveryItems = [
-  { name: "SKU 3423",     sub: "Standard Packaging", type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1235", sub: "Warehouse B",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1235", sub: "Warehouse B",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1235", sub: "Warehouse B",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1235", sub: "Warehouse B",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1236", sub: "Warehouse A",        type: "BOX", qty: 85,  packed: 0 },
-  { name: "PO-2024-1237", sub: "Warehouse C",        type: "BOX", qty: 60,  packed: 0 },
-  { name: "SKU 4891",     sub: "Standard Packaging", type: "BOX", qty: 120, packed: 0 },
-  { name: "PO-2024-1238", sub: "Warehouse B",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1239", sub: "Warehouse A",        type: "BOX", qty: 75,  packed: 0 },
-  { name: "SKU 5523",     sub: "Express Packaging",  type: "BOX", qty: 50,  packed: 0 },
-  { name: "PO-2024-1240", sub: "Warehouse C",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1241", sub: "Warehouse B",        type: "BOX", qty: 90,  packed: 0 },
-  { name: "PO-2024-1242", sub: "Warehouse A",        type: "BOX", qty: 102, packed: 0 },
-  { name: "SKU 6610",     sub: "Standard Packaging", type: "BOX", qty: 110, packed: 0 },
-  { name: "PO-2024-1243", sub: "Warehouse C",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1244", sub: "Warehouse B",        type: "BOX", qty: 65,  packed: 0 },
-  { name: "PO-2024-1245", sub: "Warehouse A",        type: "BOX", qty: 102, packed: 0 },
-  { name: "SKU 7723",     sub: "Express Packaging",  type: "BOX", qty: 80,  packed: 0 },
-  { name: "PO-2024-1246", sub: "Warehouse C",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1247", sub: "Warehouse B",        type: "BOX", qty: 95,  packed: 0 },
-  { name: "PO-2024-1248", sub: "Warehouse A",        type: "BOX", qty: 102, packed: 0 },
-  { name: "SKU 8834",     sub: "Standard Packaging", type: "BOX", qty: 70,  packed: 0 },
-  { name: "PO-2024-1249", sub: "Warehouse C",        type: "BOX", qty: 102, packed: 0 },
-  { name: "PO-2024-1250", sub: "Warehouse B",        type: "BOX", qty: 55,  packed: 0 },
-];
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -65,31 +38,105 @@ const IndigoBoxIcon = () => (
 );
 
 /* ── Table Row ── */
-const TableRow = ({ name, sub, type, qty, packed }) => (
-  <tr className="border-b border-gray-100 last:border-0">
+const TableRow = ({ name, sku, type, qty, packed }) => (
+  <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
     <td className="px-6 py-4">
       <div className="flex items-center gap-3">
         <GreyBoxIcon />
         <div>
-          <p className="text-sm font-semibold text-gray-800">{name}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{sub}</p>
+          <p className="text-[13px] font-semibold text-gray-800 line-clamp-1" title={name}>{name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">SKU: {sku}</p>
         </div>
       </div>
     </td>
     <td className="px-6 py-4">
-      <span className="bg-[#E0E7FF] text-[#432DD7] text-xs font-semibold px-3 py-1.5 rounded-lg shadow">
+      <span className="bg-[#E0E7FF] text-[#432DD7] text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm">
         {type}
       </span>
     </td>
-    <td className="px-6 py-4 text-sm text-gray-700">{qty}</td>
-    <td className="px-6 py-4 text-sm text-gray-700">{packed}</td>
+    <td className="px-6 py-4 text-sm font-semibold text-gray-700">{qty}</td>
+    <td className="px-6 py-4 text-sm font-semibold text-gray-700">{packed}</td>
   </tr>
 );
 
 /* ── DeliveryInfo Page ── */
 const DeliveryInfo = () => {
+  const [orderInfo, setOrderInfo] = useState(null);
+  const [deliveryItems, setDeliveryItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const totalPages = Math.ceil(deliveryItems.length / ITEMS_PER_PAGE);
+
+  // Fetch data from API on component mount
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        
+        // Calculate today's date for payload
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        const currentDate = `${year}-${month}-${day}`;
+
+        const payload = {
+          from_date: "2025-01-10",
+          to_date: currentDate
+        };
+
+        const res = await axios.post(
+          "http://wmsbeta.luxkutumb.info/api/sap/getPurchaseOrderByDate", 
+          payload, 
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+
+        if (res.data.status === "success") {
+          const apiData = res.data.data;
+          // Extract array
+          const dataArray = Array.isArray(apiData) ? apiData : [apiData];
+          
+          if (dataArray.length > 0) {
+            // Use the FIRST order in the array for this details page
+            const currentOrder = dataArray[0];
+            setOrderInfo(currentOrder);
+
+            // Safely extract the items array
+            let parsedItems = currentOrder.items;
+            if (typeof parsedItems === 'string') {
+              try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+            }
+            if (!Array.isArray(parsedItems)) parsedItems = [];
+
+            // Map the API items to the table's format
+            const formattedItems = parsedItems.map((item) => ({
+              name: item.name || "Unknown Product",
+              sku: item.sku || "N/A",
+              type: "PCS", // Defaulting to PCS based on clothing items, change if needed
+              qty: item.qty || 0,
+              packed: 0 // Defaulting to 0 since API doesn't provide packed amount yet
+            }));
+
+            setDeliveryItems(formattedItems);
+          }
+        } else {
+          toast.error(res.data.message || "Failed to fetch order details");
+        }
+      } catch (err) {
+        console.error("Error fetching order:", err);
+        toast.error("Network error while fetching order details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderDetails();
+  }, []);
+
+  const totalPages = Math.max(1, Math.ceil(deliveryItems.length / ITEMS_PER_PAGE));
   const paginated = deliveryItems.slice(
     (page - 1) * ITEMS_PER_PAGE,
     page * ITEMS_PER_PAGE
@@ -113,7 +160,9 @@ const DeliveryInfo = () => {
             </svg>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">PO-2024-1234</h2>
+            <h2 className="text-[15px] font-bold text-gray-900">
+              {orderInfo ? `PO-${orderInfo.order_code}` : "Loading..."}
+            </h2>
             <p className="text-xs text-gray-400 mt-0.5">Delivery Information</p>
           </div>
         </div>
@@ -136,7 +185,9 @@ const DeliveryInfo = () => {
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
             <p className="text-sm text-gray-500">Total Items</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">120</p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">
+              {loading ? "..." : deliveryItems.length}
+            </p>
           </div>
           <IndigoBoxIcon />
         </div>
@@ -146,19 +197,20 @@ const DeliveryInfo = () => {
           <div>
             <p className="text-sm text-gray-500">Cartons Packed</p>
             <p className="text-3xl font-bold text-gray-900 mt-1">
-              0{" "}
-              <span className="text-sm font-normal text-gray-400">of 6</span>
+              0 <span className="text-sm font-normal text-gray-400">of 6</span>
             </p>
             <p className="text-xs text-gray-400 mt-0.5">estimated</p>
           </div>
           <IndigoBoxIcon />
         </div>
 
-        {/* Completed */}
+        {/* Order Date */}
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
-            <p className="text-sm text-gray-500">Completed</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">05/12/2025</p>
+            <p className="text-sm text-gray-500">Order Date</p>
+            <p className="text-[22px] font-bold text-gray-900 mt-2">
+              {orderInfo ? orderInfo.order_date : "--/--/----"}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#D1FAE5" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -174,7 +226,9 @@ const DeliveryInfo = () => {
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
             <p className="text-sm text-gray-500">Status</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">Pending</p>
+            <p className="text-2xl font-bold text-gray-900 mt-1">
+              {orderInfo ? orderInfo.order_status : "..."}
+            </p>
           </div>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF3C7" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -194,29 +248,43 @@ const DeliveryInfo = () => {
           <button className="border border-gray-200 bg-white text-sm font-medium text-gray-700 px-4 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
             Delivery Items
           </button>
-          <span className="text-sm text-gray-400">Showing 2 items</span>
+          <span className="text-sm text-gray-400">Showing {deliveryItems.length} products</span>
         </div>
 
         {/* Table */}
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-100">
-              {["PRODUCT DETAILS", "TYPE", "REQUESTED QTY", "PACKED QTY"].map((h) => (
-                <th
-                  key={h}
-                  className="px-6 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider"
-                >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {paginated.map((item, i) => (
-              <TableRow key={i} {...item} />
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100">
+                {["PRODUCT DETAILS", "TYPE", "REQUESTED QTY", "PACKED QTY"].map((h) => (
+                  <th
+                    key={h}
+                    className="px-6 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider"
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
+                    Loading items...
+                  </td>
+                </tr>
+              ) : paginated.length > 0 ? (
+                paginated.map((item, i) => <TableRow key={i} {...item} />)
+              ) : (
+                <tr>
+                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
+                    No items found for this order.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
         {/* Pagination */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
@@ -233,7 +301,7 @@ const DeliveryInfo = () => {
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
+              disabled={page === totalPages || totalPages === 0}
               className="border border-gray-200 bg-white text-sm font-medium text-gray-700 px-4 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors"
             >
               Next

@@ -18,6 +18,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import Layout from "../components/Layout";
+import { useLocation, useNavigate } from "react-router-dom"; // 🟢 ADDED FOR ROUTING
 
 /* ── MOCK DATA ── */
 const checklistItems = [
@@ -28,12 +29,14 @@ const checklistItems = [
   { label: "Barcode Readability", done: false },
 ];
 
+
 const products = [
   { name: "Lux Cozi", sku: "LX-AM90-BLK", qty: 6, status: "Passed" },
   { name: "Lux Cozi ONN", sku: "LX-UB21-WHT", qty: 6, status: "Rejected" },
   { name: "Lux Winter -X", sku: "LX-RSX-GRY", qty: 6, status: "Passed" },
   { name: "Lux Lyra", sku: "LX-LYR-BLK", qty: 6, status: "Pending" },
 ];
+
 
 /* ── POPUP COMPONENTS ── */
 const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items" }) => {
@@ -155,6 +158,38 @@ const FTPCameraFeed = () => {
 
 /* ── MAIN COMPONENT ── */
 const Scanning = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  // 🟢 EXTRACT ORDER DATA FROM ROUTER
+  const orderData = location.state?.orderData || null;
+  
+  // 🟢 CREATE PRODUCTS LIST DYNAMICALLY FROM ORDER DATA
+  const [products, setProducts] = useState([]);
+  const [totalItemsCount, setTotalItemsCount] = useState(0);
+
+  useEffect(() => {
+    if (orderData && orderData.items) {
+      let parsedItems = orderData.items;
+      if (typeof parsedItems === 'string') {
+        try { parsedItems = JSON.parse(parsedItems); } catch(e) { parsedItems = []; }
+      }
+      if (!Array.isArray(parsedItems)) parsedItems = [];
+
+      setTotalItemsCount(parsedItems.length);
+
+      // Map it to the format the scanner expects
+      const formatted = parsedItems.map(item => ({
+        name: item.name || "Unknown Item",
+        sku: item.sku || "N/A",
+        qty: item.qty || 0,
+        status: "Pending" // All start as Pending
+      }));
+      setProducts(formatted);
+    }
+  }, [orderData]);
+
+
   const [passed, setPassed] = useState(false);
   const [rejected, setRejected] = useState(false);
   const [plcError, setPlcError] = useState(null);
@@ -266,8 +301,13 @@ const Scanning = () => {
                 <Layers size={22} strokeWidth={1.5} />
               </div>
               <div>
-                <h1 className="text-base font-bold text-slate-900 tracking-tight">Batch #2023-X9</h1>
-                <p className="text-sm text-slate-500 font-medium mt-0.5">Processing item 4 of 20</p>
+                {/* 🟢 DYNAMIC BATCH/ORDER INFO */}
+                <h1 className="text-base font-bold text-slate-900 tracking-tight">
+                  {orderData ? `PO-${orderData.order_code}` : "Unknown Order"}
+                </h1>
+                <p className="text-sm text-slate-500 font-medium mt-0.5">
+                  Processing item {scannedQRs.length} of {totalItemsCount}
+                </p>
               </div>
             </div>
 
@@ -309,8 +349,21 @@ const Scanning = () => {
 
           <div className="flex items-center gap-6">
             {plcError && <span className="text-rose-500 bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2"><AlertTriangle size={14} /> {plcError}</span>}
+
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold text-slate-900 leading-none">{totalItemsCount}</span>
+              <span className="w-px h-8 bg-slate-200 mx-1" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br/>Items</span>
+            </div>
+            <div className="flex items-center gap-3 border-l border-slate-200 pl-6">
+              <span className="text-2xl font-bold text-slate-900 leading-none">{Math.max(0, totalItemsCount - scannedQRs.length)}</span>
+              <span className="w-px h-8 bg-slate-200 mx-1" />
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Items<br/>Remain</span>
+            </div>
+
             <div className="flex items-center gap-3"><span className="text-2xl font-bold text-slate-900 leading-none">100</span><span className="w-px h-8 bg-slate-200 mx-1" /><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br />Boxes</span></div>
             <div className="flex items-center gap-3 border-l border-slate-200 pl-6"><span className="text-2xl font-bold text-slate-900 leading-none">200</span><span className="w-px h-8 bg-slate-200 mx-1" /><span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Boxes<br />Remain</span></div>
+
           </div>
         </header>
 
@@ -331,18 +384,30 @@ const Scanning = () => {
               </div>
             </section>
 
-            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
                 <h2 className="text-sm font-bold text-slate-900 uppercase">Product Scan</h2>
                 <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">{scannedQRs.length}/{stackSize} Scanned</span>
               </div>
-              <div className="divide-y divide-slate-100">
-                {products.map((p, i) => (
-                  <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
-                    <div><p className="text-sm font-bold text-slate-900 uppercase">{p.name}</p><p className="text-xs font-medium text-slate-500 mt-1 uppercase">{p.sku}</p></div>
-                    <div className="flex flex-col items-end gap-2"><span className="text-[11px] bg-slate-100 border border-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded-md uppercase tracking-tight">Qty: {p.qty}</span><StatusPill status={p.status} /></div>
+              <div className="divide-y divide-slate-100 overflow-y-auto custom-scrollbar flex-1">
+                {products.length > 0 ? (
+                  products.map((p, i) => (
+                    <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
+                      <div className="pr-4">
+                        <p className="text-[13px] font-bold text-slate-900 uppercase line-clamp-1" title={p.name}>{p.name}</p>
+                        <p className="text-xs font-medium text-slate-500 mt-1 uppercase">{p.sku}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 shrink-0">
+                        <span className="text-[11px] bg-slate-100 border border-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded-md uppercase tracking-tight">Qty: {p.qty}</span>
+                        <StatusPill status={p.status} />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-slate-500 text-sm font-medium">
+                    No items found for this order.
                   </div>
-                ))}
+                )}
               </div>
             </section>
           </div>
