@@ -3,14 +3,15 @@ import struct
 import requests
 import threading
 from urllib.parse import urlparse, parse_qs
+import config
 
 API_URL        = "https://leader.salaryslip.co/api/webbook/write"
-LOCAL_BRIDGE_URL = "http://127.0.0.1:5000/api/qr"
-STACK_SIZE_URL   = "http://127.0.0.1:5000/api/stack-size"
-PENDING_CMD_URL  = "http://127.0.0.1:5000/api/conveyor/pending"
+LOCAL_BRIDGE_URL = f"http://{config.BACKEND_HOST}:{config.BACKEND_PORT}/api/qr"
+STACK_SIZE_URL   = f"http://{config.BACKEND_HOST}:{config.BACKEND_PORT}/api/stack-size"
+PENDING_CMD_URL  = f"http://{config.BACKEND_HOST}:{config.BACKEND_PORT}/api/conveyor/pending"
 
-PLC_IP   = "192.168.0.40"
-PLC_PORT = 502
+PLC_IP   = config.PLC_IP
+PLC_PORT = config.PLC_PORT
 
 cached_stack_size = 6
 plc_sock = None
@@ -198,6 +199,6 @@ def run_tcp_client(host, port):
 
 
 if __name__ == "__main__":
-    HOST = "192.168.0.78"
-    PORT = 2002
+    HOST = config.CAMERA_HOST
+    PORT = config.CAMERA_PORT
     run_tcp_client(HOST, PORT)

@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import config
 
 app = Flask(__name__)
 CORS(app)
@@ -104,5 +105,5 @@ def handle_payload():
 
 
 if __name__ == "__main__":
-    print("PLC Bridge running on port 5000")
-    app.run(host='0.0.0.0', port=5000)
+    print(f"PLC Bridge running on {config.BACKEND_HOST}:{config.BACKEND_PORT}")
+    app.run(host=config.BACKEND_HOST, port=config.BACKEND_PORT)
