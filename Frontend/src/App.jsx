@@ -10,7 +10,7 @@ import { Toaster } from "react-hot-toast";
 function App() {
   return (
     <Router>
-            <Toaster position="top-right" />
+      <Toaster position="top-right" />
 
       <Routes>
         {/* Default Route */}
@@ -18,9 +18,8 @@ function App() {
 
         {/* Dashboard */}
         <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/po-details" element={<DeliveryInfo />} />
-                <Route path="/completed" element={<CompletedScan />} />
-                <Route path="/scan" element={<Scanning />} />
+        <Route path="/po-details" element={<DeliveryInfo />} />
+        <Route path="/scan" element={<Scanning />} />
 
 
         {/* 404 Page */}
@@ -28,7 +27,7 @@ function App() {
       </Routes>
     </Router>
 
-    
+
   );
 }
 

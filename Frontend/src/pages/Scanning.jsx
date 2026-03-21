@@ -3,18 +3,15 @@ import {
   Play,
   CheckCircle,
   ChevronDown,
-  Ban,
-  ClipboardList,
-  Circle,
   AlertTriangle,
   XCircle,
   CheckCircle2,
+  Circle,
   Check,
   Camera,
   Layers,
   AlertCircle,
   Scan,
-  RefreshCw,
   Upload,
   Loader2,
 } from "lucide-react";
@@ -23,18 +20,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 
-/* ── MOCK CHECKLIST ── */
-const checklistItems = [
-  { label: "Verify Package Integrity",       done: true  },
-  { label: "Confirm Label Accuracy",         done: false },
-  { label: "Weight Check (Expected: 2.5kg)", done: false },
-  { label: "Seal Inspection",                done: false },
-  { label: "Barcode Readability",            done: false },
-];
-
 /* ─────────────────────────────────────────
    SYNC CONFIRMATION MODAL
-   Shows a summary before actually syncing
 ───────────────────────────────────────── */
 const SyncModal = ({ isOpen, onClose, onConfirm, totalQRs, orderCode, isSyncing }) => {
   if (!isOpen) return null;
@@ -48,7 +35,8 @@ const SyncModal = ({ isOpen, onClose, onConfirm, totalQRs, orderCode, isSyncing 
           <div>
             <h3 className="text-lg font-bold text-slate-900">Sync to Server</h3>
             <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-              You are about to sync <span className="font-bold text-indigo-700">{totalQRs} QR code(s)</span> for PO <span className="font-bold text-indigo-700">{orderCode}</span>. This action will submit the inward data to the server.
+              You are about to sync <span className="font-bold text-indigo-700">{totalQRs} QR code(s)</span> for PO{" "}
+              <span className="font-bold text-indigo-700">{orderCode}</span>. This action will submit the inward data to the server.
             </p>
           </div>
         </div>
@@ -103,10 +91,16 @@ const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items"
             <span className="text-xs font-bold text-red-600 tracking-wide">ERROR</span>
           </div>
           <div className="flex items-center justify-end gap-3 mt-6">
-            <button onClick={onDismiss} className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
+            <button
+              onClick={onDismiss}
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
               Dismiss
             </button>
-            <button onClick={onRescan} className="px-5 py-2.5 rounded-xl bg-[#e60000] text-white text-sm font-semibold shadow-[0_6px_16px_rgba(230,0,0,0.25)] hover:bg-red-700 hover:shadow-[0_4px_12px_rgba(230,0,0,0.3)] transition-all">
+            <button
+              onClick={onRescan}
+              className="px-5 py-2.5 rounded-xl bg-[#e60000] text-white text-sm font-semibold shadow-[0_6px_16px_rgba(230,0,0,0.25)] hover:bg-red-700 hover:shadow-[0_4px_12px_rgba(230,0,0,0.3)] transition-all"
+            >
               Rescan Stack
             </button>
           </div>
@@ -121,14 +115,14 @@ const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items"
 ───────────────────────────────────────── */
 const StatusPill = ({ status }) => {
   const styles = {
-    Passed:   "text-emerald-600 bg-emerald-50 border-emerald-100",
-    Rejected: "text-rose-600 bg-rose-50 border-rose-100",
-    Pending:  "text-slate-500 bg-slate-50 border-slate-200",
+    Picked:  "text-emerald-600 bg-emerald-50 border-emerald-100",
+    Picking: "text-indigo-600 bg-indigo-50 border-indigo-100",
+    Pending: "text-slate-500 bg-slate-50 border-slate-200",
   };
   const icons = {
-    Passed:   <CheckCircle2 size={14} strokeWidth={2.5} />,
-    Rejected: <XCircle size={14} strokeWidth={2.5} />,
-    Pending:  <Circle size={14} strokeWidth={2.5} className="opacity-50" />,
+    Picked:  <CheckCircle2 size={14} strokeWidth={2.5} />,
+    Picking: <Loader2 size={14} strokeWidth={2.5} className="animate-spin" />,
+    Pending: <Circle size={14} strokeWidth={2.5} className="opacity-50" />,
   };
   return (
     <span className={`text-xs font-semibold px-2 py-1 rounded-md border flex items-center gap-1.5 w-fit ${styles[status] || styles.Pending}`}>
@@ -140,7 +134,8 @@ const StatusPill = ({ status }) => {
 
 const QRScanIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-emerald-500">
-    <path d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2M20 7V5a1 1 0 00-1-1h-2M20 17v2a1 1 0 01-1 1h-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    <path d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2M20 7V5a1 1 0 00-1-1h-2M20 17v2a1 1 0 01-1 1h-2"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
     <rect x="7" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
     <rect x="13" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
     <rect x="7" y="13" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
@@ -153,7 +148,7 @@ const QRScanIcon = () => (
 ───────────────────────────────────────── */
 const FTPCameraFeed = () => {
   const [imageUrl, setImageUrl] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError]       = useState(null);
   const [lastTimestamp, setLastTimestamp] = useState(null);
 
   useEffect(() => {
@@ -194,17 +189,23 @@ const FTPCameraFeed = () => {
 };
 
 /* ─────────────────────────────────────────
+   CONSTANTS
+───────────────────────────────────────── */
+const STALL_TIMEOUT_MS = 400;
+
+const setBeltStatus = (running) =>
+  localStorage.setItem("belt_running", running ? "true" : "false");
+
+/* ─────────────────────────────────────────
    MAIN SCANNING COMPONENT
 ───────────────────────────────────────── */
 const Scanning = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ✅ Order data passed from DeliveryInfo
   const orderData = location.state?.orderData || null;
 
-  // ✅ Build product list from order items
-  const [products, setProducts] = useState([]);
+  const [products, setProducts]           = useState([]);
   const [totalItemsCount, setTotalItemsCount] = useState(0);
 
   useEffect(() => {
@@ -217,46 +218,71 @@ const Scanning = () => {
       setTotalItemsCount(parsedItems.length);
       setProducts(parsedItems.map((item) => ({
         name: item.name || "Unknown Item",
-        sku: item.sku || "N/A",
-        qty: item.qty || 0,
+        sku:  item.sku  || "N/A",
+        qty:  item.qty  || 0,
         status: "Pending",
       })));
     }
   }, [orderData]);
 
+  // Mark belt stopped when navigating away
+  useEffect(() => {
+    return () => setBeltStatus(false);
+  }, []);
+
   // ─── Conveyor / scan state ───
-  const [passed, setPassed]     = useState(false);
-  const [rejected, setRejected] = useState(false);
   const [plcError, setPlcError] = useState(null);
 
   const [isStackDropdownOpen, setIsStackDropdownOpen] = useState(false);
   const [stackSize, setStackSize]   = useState(6);
   const [customAmount, setCustomAmount] = useState("");
-  const stackOptions = [2, 4, 6, 8, 10, 20];
+  const stackOptions = [1, 2, 3, 4, 5, 6];
 
   // ─── QR accumulation ───
-  // `currentBatchQRs`  → QRs scanned in the CURRENT live batch (from Python backend)
-  // `allScannedQRs`    → ALL QRs accumulated across ALL batches since page load
   const [currentBatchQRs, setCurrentBatchQRs] = useState([]);
   const [allScannedQRs, setAllScannedQRs]     = useState([]);
 
   // ─── Error popup ───
   const [showErrorPopup, setShowErrorPopup] = useState(false);
-  const [mismatchMsg, setMismatchMsg] = useState("");
+  const [mismatchMsg, setMismatchMsg]       = useState("");
 
   // ─── Sync modal ───
   const [showSyncModal, setShowSyncModal] = useState(false);
   const [isSyncing, setIsSyncing]         = useState(false);
 
-  /* ── Poll Python backend for live QR codes ── */
-  /* Auto-stops belt and accumulates when batch hits stackSize exactly.
-     Stops immediately and shows error if count exceeds stackSize.      */
-  const isBeltRunning = useRef(false);
-  const isProcessingBatch = useRef(false);
-  const syncedQRsRef = useRef(new Set()); // tracks all QRs ever queued to detect duplicates // prevents double-fire during clearBackendQueue delay
-  const stackSizeRef = useRef(stackSize);  // always-current stackSize inside interval
+  // ─── Synced SKU counts (persisted) ───
+  const [syncedSkuCounts, setSyncedSkuCounts] = useState(() => {
+    try {
+      const poCode = location.state?.orderData?.order_code || "unknown";
+      const stored = localStorage.getItem(`packed_${poCode}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch { return {}; }
+  });
 
-  // Sync stackSizeRef AND push to Flask on every change AND on first mount
+  // ─── Derive live packed counts per SKU from queued QRs ───
+  const packedCounts = allScannedQRs.reduce((acc, qr) => {
+    const sku = qr.split("/")[0];
+    acc[sku] = (acc[sku] || 0) + 1;
+    return acc;
+  }, {});
+
+  // ─── Refs ───
+  const isBeltRunning       = useRef(false);
+  const isProcessingBatch   = useRef(false);
+  const syncedQRsRef        = useRef(new Set());
+  const stackSizeRef        = useRef(stackSize);
+
+  // Stall detector refs
+  const lastQRArrivedAt     = useRef(null);
+  const prevBatchLengthRef  = useRef(0);
+  const stallFiredRef       = useRef(false);
+  const currentBatchRef     = useRef([]);
+  const showErrorPopupRef   = useRef(false);
+
+  // Warmup ref — stall detector is blind for 500ms after Start is clicked
+  const beltStartedAt       = useRef(null);
+
+  // Keep stackSizeRef current and push to Flask
   useEffect(() => {
     stackSizeRef.current = stackSize;
     fetch("http://localhost:5000/api/stack-size", {
@@ -264,24 +290,106 @@ const Scanning = () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stack_size: stackSize }),
     }).catch(() => {});
-  }, [stackSize]); // runs on mount (initial value) and every time user changes dropdown
+  }, [stackSize]);
 
+  // Keep mirrors in sync with state
+  useEffect(() => { currentBatchRef.current  = currentBatchQRs; }, [currentBatchQRs]);
+  useEffect(() => { showErrorPopupRef.current = showErrorPopup;  }, [showErrorPopup]);
+
+  // ─── Helper: reset all stall-detector state ───
+  const resetStall = () => {
+    lastQRArrivedAt.current    = null;
+    prevBatchLengthRef.current = 0;
+    stallFiredRef.current      = false;
+  };
+
+  // ─── Stall detector ───
+  useEffect(() => {
+    const stallInterval = setInterval(() => {
+      if (beltStartedAt.current && Date.now() - beltStartedAt.current < 500) return;
+
+      const batch    = currentBatchRef.current;
+      const batchLen = batch.length;
+
+      if (batchLen > prevBatchLengthRef.current) {
+        lastQRArrivedAt.current    = Date.now();
+        prevBatchLengthRef.current = batchLen;
+        stallFiredRef.current      = false;
+        return;
+      }
+
+      if (
+        batchLen === 0                    ||
+        batchLen >= stackSizeRef.current  ||
+        isProcessingBatch.current         ||
+        showErrorPopupRef.current         ||
+        stallFiredRef.current             ||
+        lastQRArrivedAt.current === null
+      ) return;
+
+      const elapsed = Date.now() - lastQRArrivedAt.current;
+      if (elapsed >= STALL_TIMEOUT_MS) {
+        stallFiredRef.current     = true;
+        isProcessingBatch.current = true;
+        isBeltRunning.current     = false;
+        setBeltStatus(false);
+
+        const got      = batchLen;
+        const expected = stackSizeRef.current;
+        const missing  = expected - got;
+        const msg      = `${missing} box(es) missing! Got ${got}, expected ${expected}.`;
+
+        setMismatchMsg(msg);
+        setShowErrorPopup(true);
+        toast.error(msg);
+
+        clearBackendQueue().then(() => { isProcessingBatch.current = false; });
+      }
+    }, 200);
+
+    return () => clearInterval(stallInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Poll Python backend for live QR codes (200ms) ───
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
         const response = await fetch("http://localhost:5000/api/qr");
-        const data = await response.json();
+        const data     = await response.json();
         if (!data.qr_codes) return;
 
         const incoming = data.qr_codes;
+
+        // ─── NOREAD: TCP client couldn't decode any QR → stop belt ───
+        if (
+          Array.isArray(incoming) &&
+          incoming.some((qr) => typeof qr === "string" && qr.trim().toLowerCase() === "noread")
+        ) {
+          if (!isProcessingBatch.current) {
+            isProcessingBatch.current = true;
+            isBeltRunning.current     = false;
+            setBeltStatus(false);
+            controlConveyor(1);
+            stallFiredRef.current = true;
+            const msg = "No-read detected! Camera could not decode a QR code. Belt stopped.";
+            setMismatchMsg(msg);
+            setShowErrorPopup(true);
+            toast.error(msg);
+            clearBackendQueue().then(() => { isProcessingBatch.current = false; });
+          }
+          return;
+        }
+
         setCurrentBatchQRs(incoming);
 
-        // Skip if we're mid-processing a batch state change
         if (isProcessingBatch.current) return;
 
         if (data.error) {
           isProcessingBatch.current = true;
-          isBeltRunning.current = false;
+          isBeltRunning.current     = false;
+          setBeltStatus(false);
+
           const got      = data.qr_codes?.length ?? 0;
           const expected = stackSizeRef.current;
           const missing  = data.missing ?? Math.max(0, expected - got);
@@ -292,58 +400,59 @@ const Scanning = () => {
           setMismatchMsg(msg);
           setShowErrorPopup(true);
           toast.error(msg);
-          clearBackendQueue().then(() => {
-            isProcessingBatch.current = false;
-          });
+          stallFiredRef.current = true;
+          clearBackendQueue().then(() => { isProcessingBatch.current = false; });
           return;
         }
 
         if (data.complete === true && incoming.length > 0) {
           isProcessingBatch.current = true;
+          resetStall();
 
-          // Check for duplicates using a ref (safe outside state updater)
           const hasDuplicate = incoming.some((qr) => syncedQRsRef.current.has(qr));
 
           if (hasDuplicate) {
-            // Stop belt immediately
             fetch("http://localhost:5000/api/conveyor", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ command: 1 }),
             }).catch(() => {});
+            isBeltRunning.current = false;
+            setBeltStatus(false);
             setMismatchMsg("Duplicate QR(s) detected! This stack was already scanned. Belt stopped.");
             setShowErrorPopup(true);
             toast.error("Duplicate QR(s) detected! Stack rejected.");
             clearBackendQueue().then(() => { isProcessingBatch.current = false; });
           } else {
-            // Add all to the ref set and to state
             incoming.forEach((qr) => syncedQRsRef.current.add(qr));
             setAllScannedQRs((prev) => [...prev, ...incoming]);
             toast.success(`✓ Stack of ${incoming.length} queued — belt continuing.`);
-            clearBackendQueue().then(() => { isProcessingBatch.current = false; });
+            clearBackendQueue().then(() => {
+              resetStall();
+              isProcessingBatch.current = false;
+            });
           }
           return;
         }
-
-        // Live count update — no action, just display
       } catch {}
     }, 200);
     return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Clear backend queue only (not our accumulated list) ── */
+  // ─── Clear backend queue only (not our accumulated list) ───
   const clearBackendQueue = async () => {
     try {
       await fetch("http://localhost:5000/api/qr", { method: "DELETE" });
     } catch (e) {
       console.error("Failed to clear backend queue", e);
     }
-    setCurrentBatchQRs([]); // reset live display
+    setCurrentBatchQRs([]);
+    currentBatchRef.current = [];
+    resetStall();
   };
 
-  /* ── Conveyor control ── */
-  // command: 0 = start, 1 = stop
+  // ─── Conveyor control: command 0 = start, 1 = stop ───
   const controlConveyor = async (command) => {
     try {
       setPlcError(null);
@@ -354,7 +463,8 @@ const Scanning = () => {
       });
       const data = await response.json();
       if (data.success) {
-        isBeltRunning.current = command === 0; // 0=start → running, 1=stop → not running
+        isBeltRunning.current = command === 0;
+        setBeltStatus(command === 0);
       } else {
         setPlcError("Failed to communicate with PLC");
       }
@@ -363,34 +473,25 @@ const Scanning = () => {
     }
   };
 
-  /* ── Manual Stop button ──
-     Never accumulates QRs directly.
-     - If batch is incomplete → error popup, discard batch
-     - If batch already auto-completed → belt already stopped, this is a no-op safety press
-     - If 0 QRs scanned → just stop the belt silently                                       */
   const handleStopConveyor = () => {
-    setPassed(false);
-    setRejected(false);
-    isBeltRunning.current = false; // mark stopped immediately so polling doesn't double-fire
+    isBeltRunning.current = false;
+    setBeltStatus(false);
     controlConveyor(1);
 
     if (currentBatchQRs.length > 0 && currentBatchQRs.length < stackSize) {
-      // Incomplete batch — discard, show error, force rescan
       setShowErrorPopup(true);
-      // Do NOT accumulate — these QRs are discarded
     }
-    // If currentBatchQRs.length === 0: silent stop (belt was idle)
-    // If currentBatchQRs.length === stackSize: auto-accumulate already handled it in polling
   };
 
-  /* ── Rescan: clear current batch, restart belt ── */
   const handleRescan = () => {
     setShowErrorPopup(false);
+    stallFiredRef.current = false;
+    resetStall();
     clearBackendQueue();
     controlConveyor(0);
   };
 
-  /* ── Sync: POST all accumulated QRs to the inward API ── */
+  // ─── Sync: POST all accumulated QRs to the inward API ───
   const handleSync = async () => {
     if (allScannedQRs.length === 0) {
       toast.error("No QR codes to sync. Scan some items first.");
@@ -401,9 +502,9 @@ const Scanning = () => {
       const token = localStorage.getItem("token");
       const payload = [
         {
-          po_code:        orderData?.order_code || "",
+          po_code:        orderData?.order_code    || "",
           supplier_code:  orderData?.supplier_code || "",
-          warehouse_code: orderData?.plant_code || "",
+          warehouse_code: orderData?.plant_code    || "",
           product_qrs:    allScannedQRs,
         },
       ];
@@ -413,18 +514,25 @@ const Scanning = () => {
         payload,
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      console.log("Sync API response:", res.status, JSON.stringify(res.data));
 
-      console.log("Sync API raw response:", res.status, res.data);
-
-      // API returns status: true (boolean) on success
-      const isSuccess = res.data.status === true;
+      const isSuccess =
+        res.status >= 200 &&
+        res.status < 300 &&
+        res.data.status !== false &&
+        res.data.status !== 0 &&
+        res.data.status !== "false" &&
+        res.data.status !== "error";
 
       if (isSuccess) {
         const syncedCount = allScannedQRs.length;
+        try { localStorage.removeItem(`packed_${orderData?.order_code || "unknown"}`); } catch {}
+        setSyncedSkuCounts({});
         setAllScannedQRs([]);
-        syncedQRsRef.current.clear(); // reset duplicate tracker after sync
+        syncedQRsRef.current.clear();
         setShowSyncModal(false);
-        toast.success("Synced " + syncedCount + " QR(s) — " + (res.data.message || "accepted"));
+        setIsSyncing(false);
+        toast.success("✓ Synced " + syncedCount + " QR(s) successfully!");
       } else {
         toast.error(res.data.message || res.data.error || "Sync failed. Please try again.");
       }
@@ -436,8 +544,6 @@ const Scanning = () => {
     }
   };
 
-  // ── Display values ──
-  const totalScannedSoFar = allScannedQRs.length + currentBatchQRs.length;
   const latestQR = currentBatchQRs.length > 0 ? currentBatchQRs[currentBatchQRs.length - 1] : null;
 
   return (
@@ -456,14 +562,17 @@ const Scanning = () => {
                   {orderData ? `PO-${orderData.order_code}` : "Unknown Order"}
                 </h1>
                 <p className="text-sm text-slate-500 font-medium mt-0.5">
-                  {allScannedQRs.length} synced · {currentBatchQRs.length} in current batch
+                  {allScannedQRs.length} queued · {currentBatchQRs.length} in current batch
                 </p>
               </div>
             </div>
 
             {/* Stack size selector */}
             <div className="relative ml-2">
-              <button onClick={() => setIsStackDropdownOpen(!isStackDropdownOpen)} className="flex items-center gap-3 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all">
+              <button
+                onClick={() => setIsStackDropdownOpen(!isStackDropdownOpen)}
+                className="flex items-center gap-3 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all"
+              >
                 <div className="flex flex-col text-left">
                   <span className="text-[10px] font-bold text-slate-500 leading-tight tracking-wider uppercase">Stack</span>
                   <span className="text-[10px] font-bold text-slate-500 leading-tight tracking-wider uppercase">Size:</span>
@@ -477,7 +586,11 @@ const Scanning = () => {
                 <div className="absolute top-full left-0 mt-2 w-full bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
                   <div className="py-1">
                     {stackOptions.map((opt) => (
-                      <button key={opt} onClick={() => { setStackSize(opt); setIsStackDropdownOpen(false); }} className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors ${stackSize === opt ? "bg-indigo-50/80 text-indigo-700" : "hover:bg-slate-50 text-slate-600"}`}>
+                      <button
+                        key={opt}
+                        onClick={() => { setStackSize(opt); setIsStackDropdownOpen(false); }}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 transition-colors ${stackSize === opt ? "bg-indigo-50/80 text-indigo-700" : "hover:bg-slate-50 text-slate-600"}`}
+                      >
                         <div className="flex items-center gap-3">
                           <CheckCircle size={16} className={stackSize === opt ? "text-indigo-600" : "text-slate-300"} />
                           <span className="text-sm font-medium">{opt < 10 ? `0${opt}` : opt} Items</span>
@@ -485,18 +598,6 @@ const Scanning = () => {
                         {stackSize === opt && <Check size={16} className="text-indigo-600" />}
                       </button>
                     ))}
-                  </div>
-                  <div className="border-t border-slate-100 p-4 bg-slate-50/50">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Custom Amount</label>
-                    <div className="relative flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                      <input
-                        type="number" placeholder="Qty..." value={customAmount}
-                        onChange={(e) => setCustomAmount(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && customAmount) { setStackSize(parseInt(customAmount, 10)); setIsStackDropdownOpen(false); setCustomAmount(""); }}}
-                        className="w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none"
-                      />
-                      <div className="absolute right-1.5 top-1/2 -translate-y-1/2"><span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded">PCS</span></div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -510,19 +611,16 @@ const Scanning = () => {
                 <AlertTriangle size={14} /> {plcError}
               </span>
             )}
-
             <div className="flex items-center gap-3">
               <span className="text-2xl font-bold text-slate-900 leading-none">{totalItemsCount}</span>
               <span className="w-px h-8 bg-slate-200 mx-1" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br/>Items</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Total<br />Items</span>
             </div>
             <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
               <span className="text-2xl font-bold text-indigo-600 leading-none">{allScannedQRs.length}</span>
               <span className="w-px h-8 bg-slate-200 mx-1" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">QRs<br/>Queued</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">QRs<br />Queued</span>
             </div>
-
-            {/* ✅ SYNC BUTTON */}
             <button
               onClick={() => {
                 if (allScannedQRs.length === 0) {
@@ -548,47 +646,50 @@ const Scanning = () => {
 
           {/* LEFT COLUMN */}
           <div className="flex-[0.9] flex flex-col gap-6">
-
-            {/* Checklist */}
-            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50">
-                <div className="flex items-center gap-3 text-indigo-600"><ClipboardList size={20} /><h2 className="text-sm font-bold tracking-tight text-slate-900 uppercase">Inspection Protocol: Level 2</h2></div>
-                <span className="text-xs text-slate-400 font-semibold bg-white px-2 py-1 border border-slate-200 rounded-md uppercase">Proc-992-A</span>
-              </div>
-              <div className="flex flex-col divide-y divide-slate-50 p-2">
-                {checklistItems.map((item, i) => (
-                  <div key={i} className="px-4 py-3 flex items-center gap-4 rounded-xl hover:bg-slate-50 transition-colors">
-                    {item.done ? <CheckCircle2 size={20} className="text-emerald-500 shrink-0" /> : <Circle size={20} className="text-slate-300 shrink-0" />}
-                    <span className={`text-sm ${item.done ? "text-slate-900 font-semibold" : "text-slate-600 font-medium"}`}>{item.label}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Product list */}
-            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[400px]">
+            <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
-                <h2 className="text-sm font-bold text-slate-900 uppercase">Product Scan</h2>
-                <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">{currentBatchQRs.length}/{stackSize} in batch</span>
+                <h2 className="text-sm font-bold text-slate-900 uppercase">Scanned Products</h2>
+                <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">
+                  {allScannedQRs.length} total scanned
+                </span>
+              </div>
+              <div className="px-6 py-2 grid grid-cols-2 border-b border-slate-100 bg-slate-50/30 shrink-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Count</span>
               </div>
               <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
-                {products.length > 0 ? (
-                  products.map((p, i) => (
-                    <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors">
-                      <div className="pr-4">
-                        <p className="text-[13px] font-bold text-slate-900 uppercase line-clamp-1" title={p.name}>{p.name}</p>
-                        <p className="text-xs font-medium text-slate-500 mt-1 uppercase">{p.sku}</p>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <span className="text-[11px] bg-slate-100 border border-slate-200 text-slate-600 font-bold px-2 py-0.5 rounded-md uppercase tracking-tight">Qty: {p.qty}</span>
-                        <StatusPill status={p.status} />
-                      </div>
+                {Object.keys(packedCounts).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
+                      <Scan size={20} className="text-slate-300" />
                     </div>
-                  ))
+                    <p className="text-sm font-medium text-slate-400">No items scanned yet</p>
+                    <p className="text-xs text-slate-300 mt-1">Start the belt to begin scanning</p>
+                  </div>
                 ) : (
-                  <div className="p-8 text-center text-slate-500 text-sm font-medium">No items found for this order.</div>
+                  Object.entries(packedCounts)
+                    .sort(([a], [b]) => a.localeCompare(b))
+                    .map(([sku, count], i) => (
+                      <div key={i} className="px-6 py-3.5 grid grid-cols-2 items-center hover:bg-slate-50/80 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+                          <span className="text-[13px] font-bold text-slate-900 uppercase tracking-tight">{sku}</span>
+                        </div>
+                        <div className="flex justify-end">
+                          <span className="text-[13px] font-bold bg-indigo-50 border border-indigo-200 text-indigo-700 px-3 py-0.5 rounded-md tabular-nums">
+                            {count}
+                          </span>
+                        </div>
+                      </div>
+                    ))
                 )}
               </div>
+              {Object.keys(packedCounts).length > 0 && (
+                <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between shrink-0">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total QRs</span>
+                  <span className="text-sm font-bold text-indigo-600">{allScannedQRs.length}</span>
+                </div>
+              )}
             </section>
           </div>
 
@@ -605,7 +706,9 @@ const Scanning = () => {
                   <div className="flex flex-col gap-3">
                     <button
                       onClick={() => {
-                        isProcessingBatch.current = false; // reset in case of stale lock
+                        isProcessingBatch.current = false;
+                        beltStartedAt.current = Date.now();
+                        resetStall();
                         clearBackendQueue();
                         controlConveyor(0);
                       }}
@@ -615,14 +718,10 @@ const Scanning = () => {
                     </button>
                     <button
                       onClick={handleStopConveyor}
-                      className="w-full flex items-center justify-center gap-2 bg-rose-50 text-rose-700 border border-rose-100 hover:bg-rose-100 text-sm font-bold py-3 rounded-xl transition-all uppercase"
+                      className="w-full flex items-center justify-center gap-2 bg-rose-50 text-rose-700 border border-rose-100 cursor-pointer hover:bg-rose-100 text-sm font-bold py-3 rounded-xl transition-all uppercase"
                     >
                       <div className="w-3 h-3 bg-rose-600 rounded-[3px]" />Stop
                     </button>
-                    <div className="flex gap-3 mt-2">
-                      <button onClick={() => { setRejected((r) => !r); setPassed(false); }} className={`w-full flex flex-col items-center justify-center gap-1.5 text-xs font-bold py-3 rounded-xl transition-all border uppercase ${rejected ? "bg-rose-600 border-rose-600 text-white shadow-md shadow-rose-600/20" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}><Ban size={18} strokeWidth={2.5} />Reject</button>
-                      <button onClick={() => { setPassed((p) => !p); setRejected(false); }} className={`w-full flex flex-col items-center justify-center gap-1.5 text-xs font-bold py-3 rounded-xl transition-all border uppercase ${passed ? "bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20" : "bg-white border-slate-200 text-emerald-600 hover:bg-emerald-50"}`}><CheckCircle size={18} strokeWidth={2.5} />Pass</button>
-                    </div>
                   </div>
                 </div>
 
@@ -659,7 +758,7 @@ const Scanning = () => {
               </div>
             </section>
 
-            {/* ─── LIVE SCANNER LOG — shows ALL accumulated + current batch ─── */}
+            {/* ─── LIVE SCANNER LOG ─── */}
             <section className="w-full bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-2.5">
@@ -667,13 +766,11 @@ const Scanning = () => {
                   Live Scanner Log
                 </p>
                 <div className="flex items-center gap-3">
-                  {/* Queue badge */}
                   {allScannedQRs.length > 0 && (
                     <span className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold px-2.5 py-1 rounded-md uppercase tracking-wide">
                       {allScannedQRs.length} queued for sync
                     </span>
                   )}
-                  {/* Clear queue button */}
                   {allScannedQRs.length > 0 && (
                     <button
                       onClick={() => { setAllScannedQRs([]); toast("Queue cleared.", { icon: "🗑️" }); }}
@@ -684,7 +781,6 @@ const Scanning = () => {
                   )}
                 </div>
               </div>
-
               <div className="bg-slate-900 rounded-xl p-4 font-mono flex-1 overflow-y-auto max-h-[200px] shadow-inner border border-slate-800">
                 {allScannedQRs.length === 0 && currentBatchQRs.length === 0 ? (
                   <p className="text-slate-500 text-sm font-medium flex items-center gap-2 uppercase tracking-tight">
@@ -692,17 +788,17 @@ const Scanning = () => {
                   </p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {/* Current batch (live, not yet committed) */}
                     {currentBatchQRs.map((code, index) => (
                       <div key={`live-${index}`} className="flex items-start gap-3 border-b border-slate-800 pb-2 last:border-0 last:pb-0">
                         <span className="text-amber-400 text-[10px] font-bold min-w-[36px] pt-0.5 uppercase shrink-0">LIVE</span>
                         <span className="text-amber-300 text-xs font-medium tracking-wide break-all">{code}</span>
                       </div>
                     ))}
-                    {/* Accumulated / synced queue */}
                     {[...allScannedQRs].reverse().map((code, index) => (
                       <div key={`acc-${index}`} className="flex items-start gap-3 border-b border-slate-800 pb-2 last:border-0 last:pb-0">
-                        <span className="text-slate-600 text-[10px] font-bold min-w-[36px] pt-0.5 uppercase shrink-0">{(allScannedQRs.length - index).toString().padStart(2, "0")}.</span>
+                        <span className="text-slate-600 text-[10px] font-bold min-w-[36px] pt-0.5 uppercase shrink-0">
+                          {(allScannedQRs.length - index).toString().padStart(2, "0")}.
+                        </span>
                         <span className="text-emerald-400 text-xs font-medium tracking-wide break-all">{code}</span>
                       </div>
                     ))}
@@ -719,6 +815,7 @@ const Scanning = () => {
         isOpen={showErrorPopup}
         onDismiss={() => {
           setShowErrorPopup(false);
+          stallFiredRef.current = false;
           clearBackendQueue();
         }}
         onRescan={handleRescan}

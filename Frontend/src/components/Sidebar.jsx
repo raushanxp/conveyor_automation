@@ -2,10 +2,8 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, ShoppingCart, Settings, LogOut, QrCode } from "lucide-react";
 
 const navItems = [
-  { label: "Dashboard",       icon: LayoutDashboard, path: "/dashboard" },
-  { label: "Purchase Orders", icon: ShoppingCart,    path: "/purchase-orders" },
-  { label: "Scanning",        icon: QrCode,        path: "/scan" },
-  { label: "Settings",        icon: Settings,        path: "/settings" },
+  { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
+  { label: "Scanning", icon: QrCode, path: "/scan" },
 ];
 
 const Sidebar = () => {
@@ -30,8 +28,7 @@ const Sidebar = () => {
             key={label}
             to={path}
             className={({ isActive }) =>
-              `flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
-                isActive ? "bg-white/15" : "hover:bg-white/10"
+              `flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${isActive ? "bg-white/15" : "hover:bg-white/10"
               }`
             }
           >

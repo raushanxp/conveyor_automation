@@ -2,20 +2,24 @@ import socket
 import struct
 import requests
 import threading
+import time
 from urllib.parse import urlparse, parse_qs
 import config
+from plc_queue import plc_command_queue
 
-API_URL        = "https://leader.salaryslip.co/api/webbook/write"
+API_URL          = "https://leader.salaryslip.co/api/webbook/write"
 LOCAL_BRIDGE_URL = f"http://{config.BACKEND_HOST}:{config.BACKEND_PORT}/api/qr"
 STACK_SIZE_URL   = f"http://{config.BACKEND_HOST}:{config.BACKEND_PORT}/api/stack-size"
-PENDING_CMD_URL  = f"http://{config.BACKEND_HOST}:{config.BACKEND_PORT}/api/conveyor/pending"
 
 PLC_IP   = config.PLC_IP
 PLC_PORT = config.PLC_PORT
 
 cached_stack_size = 6
-plc_sock = None
-plc_lock = threading.Lock()
+plc_sock  = None
+plc_lock  = threading.Lock()
+
+_stack_size_session = requests.Session()
+_notify_session     = requests.Session()
 
 
 # ── PLC ──────────────────────────────────────────────
@@ -37,7 +41,6 @@ def connect_plc():
 
 
 def send_plc(value: int):
-    """Send value 0 (start) or 1 (stop) to PLC register 40001."""
     global plc_sock
     packet = struct.pack('>HHHBBHH', 0, 0, 6, 1, 6, 0, value)
     with plc_lock:
@@ -47,7 +50,6 @@ def send_plc(value: int):
                     if not connect_plc():
                         continue
                 plc_sock.sendall(packet)
-                plc_sock.recv(1024)
                 label = "STARTED" if value == 0 else "STOPPED"
                 print(f"PLC {label}", flush=True)
                 return True
@@ -61,12 +63,25 @@ def send_plc(value: int):
 
 # ── BACKGROUND THREADS ───────────────────────────────
 
+def drain_plc_queue_background():
+    while True:
+        try:
+            command = plc_command_queue.get(timeout=0.01)
+            while not plc_command_queue.empty():
+                try:
+                    command = plc_command_queue.get_nowait()
+                except Exception:
+                    break
+            send_plc(command)
+        except Exception:
+            pass
+
+
 def refresh_stack_size_background():
-    """Poll stack size from Flask every 2s. Never blocks the main loop."""
     global cached_stack_size
     while True:
         try:
-            res = requests.get(STACK_SIZE_URL, timeout=2)
+            res = _stack_size_session.get(STACK_SIZE_URL, timeout=2)
             if res.status_code == 200:
                 size = int(res.json().get("stack_size", 0))
                 if size > 0 and size != cached_stack_size:
@@ -74,24 +89,7 @@ def refresh_stack_size_background():
                     print(f"Stack size updated: {cached_stack_size}", flush=True)
         except Exception:
             pass
-        threading.Event().wait(2)
-
-
-def poll_manual_commands_background():
-    """
-    Poll Flask for manual Start/Stop commands sent by React buttons.
-    Runs every 200ms so manual button response is near-instant.
-    """
-    while True:
-        try:
-            res = requests.get(PENDING_CMD_URL, timeout=1)
-            if res.status_code == 200:
-                cmd = res.json().get("command")
-                if cmd is not None:
-                    send_plc(cmd)
-        except Exception:
-            pass
-        threading.Event().wait(0.2)
+        time.sleep(2)
 
 
 # ── HELPERS ──────────────────────────────────────────
@@ -117,27 +115,35 @@ def notify_react(qr_codes, complete=False, error=None, missing=0, extra=0):
         payload["error"]   = error
         payload["missing"] = missing
         payload["extra"]   = extra
-    try:
-        requests.post(LOCAL_BRIDGE_URL, json=payload, timeout=2)
-    except Exception:
-        pass
+
+    def _send():
+        try:
+            _notify_session.post(LOCAL_BRIDGE_URL, json=payload, timeout=2)
+        except Exception:
+            pass
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
-def post_to_cloud_api(payload: str):
-    try:
-        response = requests.post(API_URL, json={"data": payload}, timeout=5)
-        if response.status_code != 200:
-            print(f"API error {response.status_code}: {response.text}")
-    except Exception as e:
-        print(f"Failed to send to API: {e}")
+def post_to_cloud_api(codes: list):
+    def _send():
+        for code in codes:
+            try:
+                response = requests.post(API_URL, json={"data": code}, timeout=5)
+                if response.status_code != 200:
+                    print(f"API error {response.status_code}: {response.text}")
+            except Exception as e:
+                print(f"Failed to send to API: {e}")
+
+    threading.Thread(target=_send, daemon=True).start()
 
 
 # ── MAIN ─────────────────────────────────────────────
 
 def run_tcp_client(host, port):
     connect_plc()
+    threading.Thread(target=drain_plc_queue_background, daemon=True).start()
     threading.Thread(target=refresh_stack_size_background, daemon=True).start()
-    threading.Thread(target=poll_manual_commands_background, daemon=True).start()
 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -157,14 +163,22 @@ def run_tcp_client(host, port):
                 decoded_buffer = data.decode("utf-8", errors="ignore")
 
             raw_codes = [c.strip() for c in decoded_buffer.replace('\n', ';').split(';') if c.strip()]
-            raw_codes = [c for c in raw_codes if c.lower() != "noread"]
+
+            # ── NOREAD: stop belt immediately and notify React ──
+            has_noread = any(c.lower() == "noread" for c in raw_codes)
+            if has_noread:
+                print("❌ NOREAD received — stopping belt.", flush=True)
+                send_plc(1)  # stop belt immediately via PLC
+                notify_react(["noread"], error="noread", missing=0, extra=0)
+                continue     # skip normal QR processing for this packet
+
             codes = [extract_qr_value(c) for c in raw_codes]
 
             if not codes:
                 continue
 
             stack_size = cached_stack_size
-            count = len(codes)
+            count      = len(codes)
 
             print(f"Packet: {count} QR(s), expected: {stack_size}", flush=True)
 
@@ -172,18 +186,18 @@ def run_tcp_client(host, port):
                 print(f"✅ Stack of {stack_size} complete — belt continues", flush=True)
                 for code in codes:
                     print(f"  QR: {code}", flush=True)
-                    post_to_cloud_api(code)
+                post_to_cloud_api(codes)
                 notify_react(codes, complete=True)
 
             else:
                 missing = max(0, stack_size - count)
                 extra   = max(0, count - stack_size)
                 print(f"❌ MISMATCH: got {count}, expected {stack_size} | missing={missing} extra={extra}", flush=True)
-                send_plc(1)   # stop — persistent socket, no handshake delay
+                send_plc(1)
+                post_to_cloud_api(codes)
+                notify_react(codes, error="mismatch", missing=missing, extra=extra)
                 for code in codes:
                     print(f"  QR: {code}", flush=True)
-                    post_to_cloud_api(code)
-                notify_react(codes, error="mismatch", missing=missing, extra=extra)
 
     except KeyboardInterrupt:
         print("Client stopped by user.")

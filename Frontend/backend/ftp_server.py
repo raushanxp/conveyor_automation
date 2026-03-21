@@ -1,8 +1,11 @@
 import logging
 import os
+import posixpath
 from pyftpdlib.authorizers import DummyAuthorizer
 from pyftpdlib.handlers import FTPHandler
 from pyftpdlib.servers import FTPServer
+from pyftpdlib.filesystems import AbstractedFS
+from pyftpdlib._compat import u, unicode
 import config
 
 # Configure logging
@@ -34,6 +37,23 @@ class CameraFTPHandler(FTPHandler):
         if os.path.exists(file_path):
             os.remove(file_path)
 
+
+class WindowsSafeFS(AbstractedFS):
+    """Fix for Windows: os.path.normpath turns '/192.168.0.78/...'
+    into a UNC path '\\\\192.168.0.78\\...'. We use posixpath for
+    FTP virtual path normalization instead."""
+
+    def ftpnorm(self, ftppath):
+        assert isinstance(ftppath, unicode), ftppath
+        if posixpath.isabs(ftppath):
+            p = posixpath.normpath(ftppath)
+        else:
+            p = posixpath.normpath(posixpath.join(self.cwd, ftppath))
+        # Anti path traversal
+        if not posixpath.isabs(p):
+            p = u("/")
+        return p
+
 def run_ftp_server():
     # Ensure data directory exists
     if not os.path.exists(config.DATA_DIR):
@@ -51,6 +71,10 @@ def run_ftp_server():
 
     handler = CameraFTPHandler
     handler.authorizer = authorizer
+    handler.abstracted_fs = WindowsSafeFS
+    handler.passive_ports = range(60000, 60100)
+    handler.masquerade_address = config.FTP_HOST
+    handler.permit_foreign_addresses = True
     handler.banner = "Hikrobot Camera Ingestion Server Ready."
 
     address = (config.FTP_HOST, config.FTP_PORT)

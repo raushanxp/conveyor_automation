@@ -43,10 +43,10 @@ PYTHON = sys.executable
 # Start backend services
 print("Starting backend services...\n")
 
-start_process(f"{PYTHON} server.py", cwd=BACKEND_DIR)
+# connect.py runs Flask + tcp_client in one process so they share
+# the in-process PLC command queue — no poll latency on start/stop.
+start_process(f"{PYTHON} connect.py", cwd=BACKEND_DIR)
 print("  ✅ Flask PLC Bridge       (port 5000)")
-
-start_process(f"{PYTHON} tcp_client.py", cwd=BACKEND_DIR)
 print("  ✅ QR Scanner TCP Client")
 
 start_process(f"{PYTHON} ftp_server.py", cwd=BACKEND_DIR)

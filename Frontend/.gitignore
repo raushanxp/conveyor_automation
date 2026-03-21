@@ -27,3 +27,5 @@ dist-ssr
 backend/hik-camera-data/
 backend/__pycache__/
 backend/ingestion.log
+backend/Lib/
+backend/Scripts/

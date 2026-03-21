@@ -1,4 +1,47 @@
+# ===== Python =====
 __pycache__/
-ftp_config/hik-camera-data/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
 venv/
+
+
+# ===== Node.js =====
+node_modules/
+package-lock.json
+dist/
+dist-ssr/
+*.local
+
+# ===== Logs =====
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+ingestion.log
+
+# ===== Virtual Environment (inside Frontend/) =====
+Frontend/Lib/
+Frontend/Scripts/
+
+# ===== FTP Camera Data (runtime data, not code) =====
+ftp_config/hik-camera-data/
+backend_testing/ftp_config/hik-camera-data/
+Frontend/backend/hik-camera-data/
+
+# ===== IDE / Editor =====
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ===== OS Files =====
+.DS_Store
+Thumbs.db
+desktop.ini
