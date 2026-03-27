@@ -15,6 +15,8 @@ import {
   Filter,
   Layers,
   CheckSquare,
+  Info,
+  Truck,
 } from "lucide-react";
 import Layout from "../components/Layout";
 import axios from "axios";
@@ -98,15 +100,18 @@ const SortIcon = ({ sorted }) => {
 ───────────────────────────────────────────── */
 const statusConfig = {
   Pending: { bg: "bg-amber-50", text: "text-amber-600" },
-  Picking: { bg: "bg-blue-50", text: "text-blue-500" },
+  Partial: { bg: "bg-blue-50", text: "text-blue-500" },
   Completed: { bg: "bg-emerald-50", text: "text-emerald-600" },
 };
 
 const StatusBadge = ({ status }) => {
-  const cfg = statusConfig[status] || { bg: "bg-gray-100", text: "text-gray-500" };
+  // Map "Picking" to "Partial" for badge display if API still returns old status
+  const displayStatus = status === "Picking" ? "Partial" : status;
+  const cfg = statusConfig[displayStatus] || { bg: "bg-gray-100", text: "text-gray-500" };
+  
   return (
     <span className={`${cfg.bg} ${cfg.text} text-xs font-semibold px-3 py-1.5 rounded-md`}>
-      {status}
+      {displayStatus}
     </span>
   );
 };
@@ -117,44 +122,121 @@ const StatusBadge = ({ status }) => {
 const columnHelper = createColumnHelper();
 
 /* ─────────────────────────────────────────────
-   Multi-PO Selection Banner
+   Selection Banner — single vs multi
 ───────────────────────────────────────────── */
-const SelectionBanner = ({ count, onClear, onStartInwarding, onViewInfo }) => (
-  <div className="flex items-center justify-between bg-indigo-600 text-white rounded-xl px-5 py-3 mb-3 shadow-md animate-in fade-in slide-in-from-top-2 duration-200">
-    <div className="flex items-center gap-3">
-      <div className="w-7 h-7 bg-white/20 rounded-lg flex items-center justify-center">
-        <CheckSquare size={15} />
-      </div>
-      <span className="text-sm font-bold">
-        {count} PO{count > 1 ? "s" : ""} selected
-      </span>
-      <span className="text-indigo-200 text-xs font-medium">
-        • Multi-PO inward mode
-      </span>
+const SelectionBanner = ({ count, selectedOrders, onClear, onStartInwarding, onViewInfo, onStartSingle }) => {
+  const isSingle = count === 1;
+  const order = isSingle ? selectedOrders[0] : null;
+
+  return (
+    <div
+      className={`rounded-xl px-5 py-3 mb-3 shadow-md border transition-all ${
+        isSingle
+          ? "bg-white border-indigo-200"
+          : "bg-indigo-600 border-indigo-600"
+      }`}
+    >
+      {isSingle ? (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0">
+              <CheckSquare size={16} className="text-indigo-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900 leading-tight">
+                PO-{order?.orderCode}
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {order?.date} · {order?.status === "Picking" ? "Partial" : order?.status}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onViewInfo}
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              <Info size={13} />
+              View Details
+            </button>
+            <button
+              onClick={onStartSingle}
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm"
+            >
+              <Truck size={13} />
+              Start Inwarding
+            </button>
+            <button
+              onClick={onClear}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors ml-1"
+              title="Clear selection"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
+              <Layers size={16} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-white leading-tight">
+                  {count} POs selected
+                </p>
+                <span className="text-[10px] font-bold bg-white/20 text-white/90 px-2 py-0.5 rounded-md border border-white/20 uppercase tracking-wide">
+                  Multi-PO Mode
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                {selectedOrders.slice(0, 5).map((o) => (
+                  <span
+                    key={o.id}
+                    className="text-[10px] font-bold bg-white/15 text-white/80 border border-white/20 px-2 py-0.5 rounded-md"
+                  >
+                    PO-{o.orderCode}
+                  </span>
+                ))}
+                {selectedOrders.length > 5 && (
+                  <span className="text-[10px] font-bold text-white/60">
+                    +{selectedOrders.length - 5} more
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onViewInfo}
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors border border-white/20"
+            >
+              <Info size={13} />
+              Combined Info
+            </button>
+            <button
+              onClick={onStartInwarding}
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg bg-white hover:bg-indigo-50 text-indigo-700 transition-colors shadow-sm"
+            >
+              <Truck size={13} />
+              Start Multi-PO Inward
+            </button>
+            <button
+              onClick={onClear}
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors border border-white/20 ml-1"
+              title="Clear selection"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
-    <div className="flex items-center gap-2">
-      <button
-        onClick={onViewInfo}
-        className="text-xs font-bold px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 transition-colors border border-white/20"
-      >
-        View Combined Info
-      </button>
-      <button
-        onClick={onStartInwarding}
-        className="text-xs font-bold px-4 py-1.5 rounded-lg bg-white hover:bg-indigo-50 text-indigo-700 transition-colors shadow-sm"
-      >
-        Start Multi-PO Inward →
-      </button>
-      <button
-        onClick={onClear}
-        className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/15 hover:bg-white/25 transition-colors ml-1"
-        title="Clear selection"
-      >
-        <X size={14} />
-      </button>
-    </div>
-  </div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────────
    Dashboard
@@ -164,7 +246,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // ── Filters state ──
   const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState([]);
   const [statusFilter, setStatusFilter] = useState("All");
@@ -172,10 +253,8 @@ const Dashboard = () => {
   const [toDate, setToDate] = useState("");
   const [showDateFilter, setShowDateFilter] = useState(false);
 
-  // ── Multi-selection state ──
   const [selectedOrderIds, setSelectedOrderIds] = useState(new Set());
 
-  /* ── Fetch ── */
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -193,27 +272,14 @@ const Dashboard = () => {
           const apiData = res.data.data;
           const dataArray = Array.isArray(apiData) ? apiData : [apiData];
 
-          const formattedOrders = dataArray.map((order) => {
-            let finalCount = 0;
-            if (order.items) {
-              if (Array.isArray(order.items)) finalCount = order.items.length;
-              else if (typeof order.items === "string") {
-                try { finalCount = JSON.parse(order.items).length; } catch { finalCount = 0; }
-              } else if (typeof order.items === "object") {
-                finalCount = Object.keys(order.items).length;
-              }
-            }
-            return {
-              id: order.id,
-              orderId: String(order.id),
-              orderCode: order.order_code,
-              poCode: `PO: ${order.order_code}`,
-              status: order.order_status,
-              itemCount: finalCount,
-              date: order.order_date,
-              rawOrder: order,
-            };
-          });
+          const formattedOrders = dataArray.map((order) => ({
+            id: order.id,
+            orderId: String(order.id),
+            orderCode: order.order_code,
+            poCode: `PO: ${order.order_code}`,
+            status: order.order_status, // This remains as received from API
+            date: order.order_date,
+          }));
 
           setOrders(formattedOrders);
         } else {
@@ -230,19 +296,17 @@ const Dashboard = () => {
     fetchOrders();
   }, []);
 
-  /* ── Row click — single PO flow ── */
   const handleRowClick = (order, e) => {
-    // Don't navigate if clicking the checkbox
     if (e.target.type === "checkbox" || e.target.closest("[data-checkbox]")) return;
-    // If in selection mode, toggle selection instead of navigating
     if (selectedOrderIds.size > 0) {
       toggleSelection(order.id);
       return;
     }
-    navigate("/po-details", { state: { orderData: order.rawOrder } });
+    navigate("/po-details", {
+      state: { poIds: [order.id] },
+    });
   };
 
-  /* ── Selection helpers ── */
   const toggleSelection = (id) => {
     setSelectedOrderIds((prev) => {
       const next = new Set(prev);
@@ -257,39 +321,40 @@ const Dashboard = () => {
     [orders, selectedOrderIds]
   );
 
-  const handleStartMultiInward = () => {
-    if (selectedOrders.length < 1) return;
+  const handleStartSingleInward = () => {
+    if (selectedOrders.length !== 1) return;
     navigate("/scan", {
-      state: {
-        multiMode: true,
-        ordersData: selectedOrders.map((o) => o.rawOrder),
-      },
+      state: { multiMode: false, poIds: [selectedOrders[0].id] },
     });
   };
 
-  const handleViewMultiInfo = () => {
+  const handleStartMultiInward = () => {
+    if (selectedOrders.length < 2) return;
+    navigate("/scan", {
+      state: { multiMode: true, poIds: selectedOrders.map((o) => o.id) },
+    });
+  };
+
+  const handleViewInfo = () => {
     if (selectedOrders.length < 1) return;
-    navigate("/multi-po-info", {
-      state: {
-        ordersData: selectedOrders.map((o) => o.rawOrder),
-      },
+    navigate("/po-details", {
+      state: { poIds: selectedOrders.map((o) => o.id) },
     });
   };
 
-  /* ── Apply date + status filter ── */
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      if (statusFilter !== "All" && o.status !== statusFilter) return false;
+      // Map the filter "Partial" back to "Picking" for logic if needed
+      const logicalStatus = o.status === "Picking" ? "Partial" : o.status;
+      if (statusFilter !== "All" && logicalStatus !== statusFilter) return false;
       if (fromDate && o.date < fromDate) return false;
       if (toDate && o.date > toDate) return false;
       return true;
     });
   }, [orders, statusFilter, fromDate, toDate]);
 
-  /* ── Columns ── */
   const columns = useMemo(
     () => [
-      // Checkbox column
       columnHelper.display({
         id: "select",
         header: () => null,
@@ -324,15 +389,12 @@ const Dashboard = () => {
         enableSorting: false,
         size: 44,
       }),
-
-      // Hidden column for search
       columnHelper.accessor("orderCode", {
         id: "orderCode",
         header: () => null,
         enableSorting: false,
         cell: () => null,
       }),
-
       columnHelper.accessor("orderId", {
         id: "orderId",
         header: "ORDER ID",
@@ -358,19 +420,6 @@ const Dashboard = () => {
         enableSorting: true,
         cell: (info) => <StatusBadge status={info.getValue()} />,
       }),
-      columnHelper.accessor("itemCount", {
-        header: "NO OF ITEMS",
-        enableSorting: true,
-        cell: (info) => (
-          <div className="flex items-center gap-2">
-            <BoxSVG size={14} color="#9CA3AF" />
-            <span className="text-sm text-gray-800 font-bold">
-              {info.getValue()}{" "}
-              <span className="text-xs font-normal text-gray-500">Products</span>
-            </span>
-          </div>
-        ),
-      }),
       columnHelper.accessor("date", {
         header: "ORDER DATE",
         enableSorting: true,
@@ -382,20 +431,18 @@ const Dashboard = () => {
         ),
       }),
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedOrderIds]
   );
 
-  /* ── Custom global filter ── */
   const customGlobalFilter = (row, _columnId, filterValue) => {
     const q = String(filterValue).toLowerCase();
-    const { orderId, orderCode, poCode, status, date, itemCount } = row.original;
-    return [orderId, orderCode, poCode, status, date, String(itemCount)].some(
+    const { orderId, orderCode, poCode, status, date } = row.original;
+    const displayStatus = status === "Picking" ? "Partial" : status;
+    return [orderId, orderCode, poCode, displayStatus, date].some(
       (val) => String(val ?? "").toLowerCase().includes(q)
     );
   };
 
-  /* ── Table instance ── */
   const table = useReactTable({
     data: filteredOrders,
     columns,
@@ -418,14 +465,12 @@ const Dashboard = () => {
 
   const hasDateFilter = fromDate || toDate;
 
-  /* ── Stats ── */
   const pendingCount = orders.filter((o) => o.status === "Pending").length;
-  const pickingCount = orders.filter((o) => o.status === "Picking").length;
+  const partialCount = orders.filter((o) => o.status === "Picking").length;
   const completedCount = orders.filter((o) => o.status === "Completed").length;
 
   return (
     <Layout>
-      {/* ── Page Header ── */}
       <div className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between mb-4 shadow-sm">
         <div className="flex items-center gap-3">
           <QRIcon />
@@ -439,7 +484,6 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {/* ── Stat Cards ── */}
       <div className="flex gap-4 mb-4">
         <StatCard
           label="Pending Orders"
@@ -448,8 +492,8 @@ const Dashboard = () => {
           icon={<Clock size={22} color="#EF4444" />}
         />
         <StatCard
-          label="Currently Picking"
-          value={pickingCount || "0"}
+          label="Partial"
+          value={partialCount || "0"}
           iconBg="#EEF2FF"
           icon={<BoxSVG size={22} color="#6366F1" />}
         />
@@ -461,23 +505,19 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* ── Multi-PO Selection Banner ── */}
       {selectedOrderIds.size > 0 && (
         <SelectionBanner
           count={selectedOrderIds.size}
+          selectedOrders={selectedOrders}
           onClear={() => setSelectedOrderIds(new Set())}
           onStartInwarding={handleStartMultiInward}
-          onViewInfo={handleViewMultiInfo}
+          onStartSingle={handleStartSingleInward}
+          onViewInfo={handleViewInfo}
         />
       )}
 
-      {/* ── Orders Table ── */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-
-        {/* ── Toolbar ── */}
         <div className="flex flex-wrap items-center gap-3 px-6 py-3 border-b border-gray-100">
-
-          {/* Search */}
           <div className="relative flex-1 min-w-[200px] max-w-xs">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -497,9 +537,8 @@ const Dashboard = () => {
             )}
           </div>
 
-          {/* Status filter pills */}
           <div className="flex gap-1.5">
-            {["All", "Pending", "Picking", "Completed"].map((s) => (
+            {["All", "Pending", "Partial", "Completed"].map((s) => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
@@ -514,7 +553,6 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* Date filter toggle */}
           <div className="relative">
             <button
               onClick={() => setShowDateFilter((v) => !v)}
@@ -579,7 +617,6 @@ const Dashboard = () => {
           </span>
         </div>
 
-        {/* ── Table ── */}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -608,7 +645,7 @@ const Dashboard = () => {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-10 text-center text-sm text-gray-400">
+                  <td colSpan="4" className="px-6 py-10 text-center text-sm text-gray-400">
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-indigo-300 border-t-indigo-500 rounded-full animate-spin" />
                       Loading orders…
@@ -642,7 +679,7 @@ const Dashboard = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-10 text-center text-sm text-gray-400">
+                  <td colSpan="4" className="px-6 py-10 text-center text-sm text-gray-400">
                     No orders match your filters.
                   </td>
                 </tr>
@@ -651,7 +688,6 @@ const Dashboard = () => {
           </table>
         </div>
 
-        {/* ── Pagination ── */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400">Rows per page:</span>

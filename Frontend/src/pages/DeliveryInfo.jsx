@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Printer } from "lucide-react";
+import { useState, useEffect } from "react";
 import Layout from "../components/Layout";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import axios from "axios";
+import toast from "react-hot-toast";
 
 const ITEMS_PER_PAGE = 5;
 
@@ -36,64 +37,196 @@ const IndigoBoxIcon = () => (
 );
 
 /* ── Table Row ── */
-const TableRow = ({ name, sku, type, qty, packed }) => (
-  <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-    <td className="px-6 py-4">
-      <div className="flex items-center gap-3">
-        <GreyBoxIcon />
-        <div>
-          <p className="text-[13px] font-semibold text-gray-800 line-clamp-1" title={name}>{name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">SKU: {sku}</p>
+const TableRow = ({ name, sku, type, qty, received_qty, pending_qty, packed }) => {
+  const isFullyReceived = pending_qty === 0;
+  const hasPartial = received_qty > 0 && pending_qty > 0;
+
+  return (
+    <tr className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <GreyBoxIcon />
+          <div>
+            <p className="text-[13px] font-semibold text-gray-800 line-clamp-1" title={name}>{name}</p>
+            <p className="text-xs text-gray-500 mt-0.5">SKU: {sku}</p>
+          </div>
         </div>
-      </div>
-    </td>
-    <td className="px-6 py-4">
-      <span className="bg-[#E0E7FF] text-[#432DD7] text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm">
-        {type}
-      </span>
-    </td>
-    <td className="px-6 py-4 text-sm font-semibold text-gray-700">{qty}</td>
-    <td className="px-6 py-4 text-sm font-semibold text-gray-700">{packed}</td>
-  </tr>
+      </td>
+      <td className="px-6 py-4">
+        <span className="bg-[#E0E7FF] text-[#432DD7] text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm">
+          {type}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-sm font-semibold text-gray-700">{qty}</td>
+      <td className="px-6 py-4 text-sm font-semibold text-emerald-600">{received_qty}</td>
+      <td className="px-6 py-4">
+        <span className={`text-sm font-semibold ${
+          isFullyReceived
+            ? "text-emerald-600"
+            : hasPartial
+            ? "text-amber-500"
+            : "text-gray-700"
+        }`}>
+          {pending_qty}
+        </span>
+      </td>
+      <td className="px-6 py-4">
+        <span className={`text-sm font-semibold ${
+          packed >= pending_qty && pending_qty > 0
+            ? "text-emerald-600"
+            : packed >= qty && qty > 0
+            ? "text-emerald-600"
+            : packed > 0
+            ? "text-blue-500"
+            : "text-gray-700"
+        }`}>
+          {packed}
+        </span>
+      </td>
+    </tr>
+  );
+};
+
+/* ── Loading Skeleton ── */
+const LoadingSkeleton = () => (
+  <div className="animate-pulse">
+    <div className="h-8 bg-gray-100 rounded-lg mb-4 w-1/3" />
+    <div className="grid grid-cols-4 gap-4 mb-4">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-gray-100 rounded-xl h-24" />
+      ))}
+    </div>
+    <div className="bg-gray-100 rounded-xl h-64" />
+  </div>
 );
 
 /* ── DeliveryInfo Page ── */
 const DeliveryInfo = () => {
-  // ✅ Use the order data passed from Dashboard via router state
   const location = useLocation();
   const navigate = useNavigate();
-  const orderData = location.state?.orderData || null;
 
+  // Receive an array of numeric PO ids from Dashboard navigation state
+  const poIds = location.state?.poIds || [];
+
+  const [ordersData, setOrdersData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
 
-  // ✅ Parse items from the passed orderData
-  let deliveryItems = [];
-  if (orderData && orderData.items) {
-    let parsedItems = orderData.items;
-    if (typeof parsedItems === "string") {
-      try { parsedItems = JSON.parse(parsedItems); } catch (e) { parsedItems = []; }
+  const isMulti = poIds.length > 1;
+
+  /* ── Fetch PO details from purchase-order-by-ids ── */
+  useEffect(() => {
+    if (poIds.length === 0) {
+      setLoading(false);
+      return;
     }
-    if (!Array.isArray(parsedItems)) parsedItems = [];
 
-    deliveryItems = parsedItems.map((item) => ({
-      name: item.name || "Unknown Product",
-      sku: item.sku || "N/A",
-      type: "PCS",
-      qty: item.qty || 0,
-      packed: 0,
-    }));
-  }
+    const fetchOrderDetails = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.post(
+          "http://wmsbeta.luxkutumb.info/api/sap/purchase-order-by-ids",
+          { po_ids: poIds },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-  // ✅ Navigate to /scan and pass the full raw order for context
+        if (res.data.status === "success") {
+          const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
+          setOrdersData(data);
+        } else {
+          toast.error(res.data.message || "Failed to fetch order details");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Network error while fetching order details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrderDetails();
+  }, []); // eslint-disable-line
+
+  // For single PO display — use the first order
+  const primaryOrder = ordersData[0] || null;
+
+  // ── Read packed counts from localStorage (written by Scanning page on each successful sync) ──
+  // Key format: "packed_<po_code>" — same key written in Scanning.jsx handleSync
+  const packedCounts = (() => {
+    try {
+      const poCode = primaryOrder?.order_code || "unknown";
+      const stored = localStorage.getItem(`packed_${poCode}`);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  })();
+
+  // ── Build flat list of all delivery items across all POs ──
+  const deliveryItems = (() => {
+    const items = [];
+    ordersData.forEach((order) => {
+      let parsedItems = order.items;
+      if (typeof parsedItems === "string") {
+        try { parsedItems = JSON.parse(parsedItems); } catch { parsedItems = []; }
+      }
+      if (!Array.isArray(parsedItems)) parsedItems = [];
+
+      parsedItems.forEach((item) => {
+        // packed comes from localStorage — 0 if nothing synced yet for this SKU
+        const packed = packedCounts[item.sku] || 0;
+        items.push({
+          name:         item.name         || "Unknown Product",
+          sku:          item.sku          || "N/A",
+          type:         item.uom          || "PCS",
+          qty:          item.qty          || 0,
+          received_qty: item.received_qty || 0,
+          pending_qty:  item.pending_qty  || 0,
+          packed,
+          orderCode: order.order_code,
+        });
+      });
+    });
+    return items;
+  })();
+
+  // Total quantity across all POs
+  const totalQuantity = ordersData.reduce((sum, order) => {
+    const qty = parseFloat(order.total_requested_qty || 0);
+    return sum + (isNaN(qty) ? 0 : qty);
+  }, 0);
+
+  // Total already received across all items
+  const totalReceived = deliveryItems.reduce((sum, item) => sum + (item.received_qty || 0), 0);
+
+  // Total pending across all items
+  const totalPending = deliveryItems.reduce((sum, item) => sum + (item.pending_qty || 0), 0);
+
   const handleStartInwarding = () => {
-    navigate("/scan", { state: { orderData } });
+    // Pass only the PO ids to Scanning — it will fetch its own data
+    if (isMulti) {
+      navigate("/scan", {
+        state: { multiMode: true, poIds },
+      });
+    } else {
+      navigate("/scan", {
+        state: { multiMode: false, poIds },
+      });
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(deliveryItems.length / ITEMS_PER_PAGE));
-  const paginated = deliveryItems.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE
-  );
+  const paginated  = deliveryItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-6">
+          <LoadingSkeleton />
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -113,19 +246,27 @@ const DeliveryInfo = () => {
             </svg>
           </div>
           <div>
-            <h2 className="text-[15px] font-bold text-gray-900">
-              {orderData ? `PO-${orderData.order_code}` : "No Order Selected"}
-            </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Delivery Information</p>
+            {isMulti ? (
+              <>
+                <h2 className="text-[15px] font-bold text-gray-900">
+                  {ordersData.length} Purchase Orders
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {ordersData.map((o) => `PO-${o.order_code}`).join(", ")}
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-[15px] font-bold text-gray-900">
+                  {primaryOrder ? `PO-${primaryOrder.order_code}` : "No Order Selected"}
+                </h2>
+                <p className="text-xs text-gray-400 mt-0.5">Delivery Information</p>
+              </>
+            )}
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 border border-gray-200 bg-white text-gray-600 text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-            <Printer size={14} />
-            Print Label
-          </button>
-          {/* ✅ Pass orderData to scanning page */}
           <button
             onClick={handleStartInwarding}
             className="bg-red-500 hover:bg-red-600 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors shadow-sm"
@@ -142,21 +283,23 @@ const DeliveryInfo = () => {
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
             <p className="text-sm text-gray-500">Total Items</p>
-            <p className="text-3xl font-bold text-gray-900 mt-1">
-              {deliveryItems.length}
-            </p>
+            <p className="text-3xl font-bold text-gray-900 mt-1">{deliveryItems.length}</p>
           </div>
           <IndigoBoxIcon />
         </div>
 
-        {/* Cartons Packed */}
+        {/* Total Quantity */}
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
             <p className="text-sm text-gray-500">Total Quantity</p>
             <p className="text-3xl font-bold text-gray-900 mt-1">
-              {orderData?.total_quantity ? parseFloat(orderData.total_quantity).toFixed(0) : "0"}
+              {totalQuantity > 0 ? totalQuantity.toFixed(0) : "0"}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">units expected</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              <span className="text-emerald-500 font-semibold">{totalReceived} received</span>
+              {" · "}
+              <span className="text-amber-500 font-semibold">{totalPending} pending</span>
+            </p>
           </div>
           <IndigoBoxIcon />
         </div>
@@ -166,8 +309,13 @@ const DeliveryInfo = () => {
           <div>
             <p className="text-sm text-gray-500">Order Date</p>
             <p className="text-[22px] font-bold text-gray-900 mt-2">
-              {orderData ? orderData.order_date : "--/--/----"}
+              {isMulti
+                ? (ordersData[0]?.order_date || "--/--/----")
+                : (primaryOrder?.order_date || "--/--/----")}
             </p>
+            {isMulti && ordersData.length > 1 && (
+              <p className="text-xs text-gray-400 mt-0.5">Earliest order</p>
+            )}
           </div>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#D1FAE5" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -183,9 +331,17 @@ const DeliveryInfo = () => {
         <div className="bg-white rounded-xl border border-gray-200 px-5 py-5 flex items-start justify-between shadow-sm">
           <div>
             <p className="text-sm text-gray-500">Status</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
-              {orderData ? orderData.order_status : "..."}
-            </p>
+            {isMulti ? (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {[...new Set(ordersData.map((o) => o.order_status))].map((s) => (
+                  <span key={s} className="text-sm font-bold text-gray-900">{s}</span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {primaryOrder?.order_status || "..."}
+              </p>
+            )}
           </div>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF3C7" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -213,7 +369,7 @@ const DeliveryInfo = () => {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                {["PRODUCT DETAILS", "TYPE", "REQUESTED QTY", "PACKED QTY"].map((h) => (
+                {["PRODUCT DETAILS", "TYPE", "TOTAL QTY", "RECEIVED QTY", "PENDING QTY", "PACKED QTY"].map((h) => (
                   <th
                     key={h}
                     className="px-6 py-3 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider"
@@ -226,8 +382,8 @@ const DeliveryInfo = () => {
             <tbody>
               {deliveryItems.length === 0 ? (
                 <tr>
-                  <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-500">
-                    {orderData ? "No items found for this order." : "No order selected. Go back to the dashboard."}
+                  <td colSpan="6" className="px-6 py-8 text-center text-sm text-gray-500">
+                    {poIds.length > 0 ? "No items found for this order." : "No order selected. Go back to the dashboard."}
                   </td>
                 </tr>
               ) : (
