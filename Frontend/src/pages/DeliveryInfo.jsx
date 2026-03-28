@@ -125,7 +125,7 @@ const DeliveryInfo = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.post(
-          "http://wmsbeta.luxkutumb.info/api/sap/purchase-order-by-ids",
+          `${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
           { po_ids: poIds },
           { headers: { Authorization: `Bearer ${token}` } }
         );

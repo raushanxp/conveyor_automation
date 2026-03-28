@@ -33,9 +33,6 @@ import {
   createColumnHelper,
 } from "@tanstack/react-table";
 
-/* ─────────────────────────────────────────────
-   Shared SVG / Icons
-───────────────────────────────────────────── */
 const BoxSVG = ({ size = 16, color = "#6366F1" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <path
@@ -68,9 +65,6 @@ const QRIcon = () => (
   </div>
 );
 
-/* ─────────────────────────────────────────────
-   Stat Card
-───────────────────────────────────────────── */
 const StatCard = ({ label, value, iconBg, icon }) => (
   <div className="bg-white rounded-2xl border border-gray-100 px-6 py-5 flex items-center justify-between flex-1 shadow-sm">
     <div>
@@ -86,18 +80,12 @@ const StatCard = ({ label, value, iconBg, icon }) => (
   </div>
 );
 
-/* ─────────────────────────────────────────────
-   Sort Icon Helper
-───────────────────────────────────────────── */
 const SortIcon = ({ sorted }) => {
   if (!sorted) return <ArrowUpDown size={13} className="text-gray-300 ml-1 inline" />;
   if (sorted === "asc") return <ArrowUp size={13} className="text-indigo-500 ml-1 inline" />;
   return <ArrowDown size={13} className="text-indigo-500 ml-1 inline" />;
 };
 
-/* ─────────────────────────────────────────────
-   Status Badge
-───────────────────────────────────────────── */
 const statusConfig = {
   Pending: { bg: "bg-amber-50", text: "text-amber-600" },
   Partial: { bg: "bg-blue-50", text: "text-blue-500" },
@@ -105,10 +93,8 @@ const statusConfig = {
 };
 
 const StatusBadge = ({ status }) => {
-  // Map "Picking" to "Partial" for badge display if API still returns old status
   const displayStatus = status === "Picking" ? "Partial" : status;
   const cfg = statusConfig[displayStatus] || { bg: "bg-gray-100", text: "text-gray-500" };
-  
   return (
     <span className={`${cfg.bg} ${cfg.text} text-xs font-semibold px-3 py-1.5 rounded-md`}>
       {displayStatus}
@@ -116,14 +102,8 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-/* ─────────────────────────────────────────────
-   Column Helper
-───────────────────────────────────────────── */
 const columnHelper = createColumnHelper();
 
-/* ─────────────────────────────────────────────
-   Selection Banner — single vs multi
-───────────────────────────────────────────── */
 const SelectionBanner = ({ count, selectedOrders, onClear, onStartInwarding, onViewInfo, onStartSingle }) => {
   const isSingle = count === 1;
   const order = isSingle ? selectedOrders[0] : null;
@@ -131,9 +111,7 @@ const SelectionBanner = ({ count, selectedOrders, onClear, onStartInwarding, onV
   return (
     <div
       className={`rounded-xl px-5 py-3 mb-3 shadow-md border transition-all ${
-        isSingle
-          ? "bg-white border-indigo-200"
-          : "bg-indigo-600 border-indigo-600"
+        isSingle ? "bg-white border-indigo-200" : "bg-indigo-600 border-indigo-600"
       }`}
     >
       {isSingle ? (
@@ -151,7 +129,6 @@ const SelectionBanner = ({ count, selectedOrders, onClear, onStartInwarding, onV
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onViewInfo}
@@ -208,7 +185,6 @@ const SelectionBanner = ({ count, selectedOrders, onClear, onStartInwarding, onV
               </div>
             </div>
           </div>
-
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onViewInfo}
@@ -238,9 +214,6 @@ const SelectionBanner = ({ count, selectedOrders, onClear, onStartInwarding, onV
   );
 };
 
-/* ─────────────────────────────────────────────
-   Dashboard
-───────────────────────────────────────────── */
 const Dashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -252,7 +225,6 @@ const Dashboard = () => {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [showDateFilter, setShowDateFilter] = useState(false);
-
   const [selectedOrderIds, setSelectedOrderIds] = useState(new Set());
 
   useEffect(() => {
@@ -263,7 +235,7 @@ const Dashboard = () => {
         const currentDate = today.toISOString().split("T")[0];
 
         const res = await axios.post(
-          "http://wmsbeta.luxkutumb.info/api/sap/getPurchaseOrderByDate",
+`${import.meta.env.VITE_BASE_URL}/getPurchaseOrderByDate`,
           { from_date: "2025-01-10", to_date: currentDate },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -277,8 +249,10 @@ const Dashboard = () => {
             orderId: String(order.id),
             orderCode: order.order_code,
             poCode: `PO: ${order.order_code}`,
-            status: order.order_status, // This remains as received from API
+            status: order.order_status,
             date: order.order_date,
+            vendorCode: order.vendor_code ?? "",   // ← NEW
+            vendorName: order.vendor_name ?? "",   // ← NEW
           }));
 
           setOrders(formattedOrders);
@@ -302,9 +276,7 @@ const Dashboard = () => {
       toggleSelection(order.id);
       return;
     }
-    navigate("/po-details", {
-      state: { poIds: [order.id] },
-    });
+    navigate("/po-details", { state: { poIds: [order.id] } });
   };
 
   const toggleSelection = (id) => {
@@ -323,28 +295,21 @@ const Dashboard = () => {
 
   const handleStartSingleInward = () => {
     if (selectedOrders.length !== 1) return;
-    navigate("/scan", {
-      state: { multiMode: false, poIds: [selectedOrders[0].id] },
-    });
+    navigate("/scan", { state: { multiMode: false, poIds: [selectedOrders[0].id] } });
   };
 
   const handleStartMultiInward = () => {
     if (selectedOrders.length < 2) return;
-    navigate("/scan", {
-      state: { multiMode: true, poIds: selectedOrders.map((o) => o.id) },
-    });
+    navigate("/scan", { state: { multiMode: true, poIds: selectedOrders.map((o) => o.id) } });
   };
 
   const handleViewInfo = () => {
     if (selectedOrders.length < 1) return;
-    navigate("/po-details", {
-      state: { poIds: selectedOrders.map((o) => o.id) },
-    });
+    navigate("/po-details", { state: { poIds: selectedOrders.map((o) => o.id) } });
   };
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      // Map the filter "Partial" back to "Picking" for logic if needed
       const logicalStatus = o.status === "Picking" ? "Partial" : o.status;
       if (statusFilter !== "All" && logicalStatus !== statusFilter) return false;
       if (fromDate && o.date < fromDate) return false;
@@ -389,12 +354,26 @@ const Dashboard = () => {
         enableSorting: false,
         size: 44,
       }),
+      // Hidden columns — used for search only, never rendered
       columnHelper.accessor("orderCode", {
         id: "orderCode",
         header: () => null,
         enableSorting: false,
         cell: () => null,
       }),
+      columnHelper.accessor("vendorCode", {
+        id: "vendorCode",
+        header: () => null,
+        enableSorting: false,
+        cell: () => null,
+      }),
+      columnHelper.accessor("vendorName", {
+        id: "vendorName",
+        header: () => null,
+        enableSorting: false,
+        cell: () => null,
+      }),
+      // Visible columns
       columnHelper.accessor("orderId", {
         id: "orderId",
         header: "ORDER ID",
@@ -407,9 +386,9 @@ const Dashboard = () => {
               <BoxIcon />
               <div>
                 <p className={`text-sm font-bold ${isSelected ? "text-indigo-700" : "text-gray-900"}`}>
-                  {row.orderId}
+                  {row.poCode}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">{row.poCode}</p>
+                <p className="text-xs text-gray-400 mt-0.5">ID:{row.orderId}</p>
               </div>
             </div>
           );
@@ -434,11 +413,12 @@ const Dashboard = () => {
     [selectedOrderIds]
   );
 
+  // ← UPDATED: vendor_code and vendor_name included in search
   const customGlobalFilter = (row, _columnId, filterValue) => {
     const q = String(filterValue).toLowerCase();
-    const { orderId, orderCode, poCode, status, date } = row.original;
+    const { orderId, orderCode, poCode, status, date, vendorCode, vendorName } = row.original;
     const displayStatus = status === "Picking" ? "Partial" : status;
-    return [orderId, orderCode, poCode, displayStatus, date].some(
+    return [orderId, orderCode, poCode, displayStatus, date, vendorCode, vendorName].some(
       (val) => String(val ?? "").toLowerCase().includes(q)
     );
   };
@@ -446,7 +426,15 @@ const Dashboard = () => {
   const table = useReactTable({
     data: filteredOrders,
     columns,
-    state: { globalFilter, sorting, columnVisibility: { orderCode: false } },
+    state: {
+      globalFilter,
+      sorting,
+      columnVisibility: {
+        orderCode: false,
+        vendorCode: false,  // ← hidden but searchable
+        vendorName: false,  // ← hidden but searchable
+      },
+    },
     onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
@@ -522,7 +510,7 @@ const Dashboard = () => {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search PO, ID, date…"
+              placeholder="Search PO, ID, vendor, date…"
               value={globalFilter}
               onChange={(e) => setGlobalFilter(e.target.value)}
               className="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
