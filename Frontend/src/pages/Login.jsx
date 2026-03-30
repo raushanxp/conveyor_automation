@@ -162,7 +162,7 @@ export default function Login() {
           {/* Login Button */}
           <button
             onClick={handleLogin}
-            className="w-full py-[15px] bg-[#155DFC] hover:bg-blue-700 text-white font-semibold text-[15px] rounded-xl transition-colors tracking-wide shadow-[0_8px_24px_rgba(37,99,235,0.45)] flex items-center justify-center gap-2"
+            className="w-full py-[15px] bg-[#155DFC] cursor-pointer hover:bg-blue-700 text-white font-semibold text-[15px] rounded-xl transition-colors tracking-wide shadow-[0_8px_24px_rgba(37,99,235,0.45)] flex items-center justify-center gap-2"
           >
             Log In
             <img src="/rightarrow.svg" alt="" className="w-4 h-4 translate-y-px" />

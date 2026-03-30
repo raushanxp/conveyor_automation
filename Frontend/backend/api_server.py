@@ -9,6 +9,28 @@ import asyncio
 import json
 import config
 
+MAX_IMAGES = 50
+
+def cleanup_old_images():
+    """Keep only the latest MAX_IMAGES images; delete the rest (oldest first)."""
+    valid_extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.tiff')
+    image_files = []
+    for ext in valid_extensions:
+        image_files.extend(list(data_path.rglob(f"*{ext}")))
+        image_files.extend(list(data_path.rglob(f"*{ext.upper()}")))
+
+    # Sort oldest -> newest by modification time
+    image_files.sort(key=lambda p: p.stat().st_mtime)
+
+    # Delete files beyond the limit (the oldest ones)
+    files_to_delete = image_files[:-MAX_IMAGES] if len(image_files) > MAX_IMAGES else []
+    for f in files_to_delete:
+        try:
+            f.unlink()
+            print(f"INFO: Deleted old image to stay within {MAX_IMAGES}-image limit: {f.name}")
+        except Exception as e:
+            print(f"WARNING: Could not delete {f.name}: {e}")
+
 try:
     from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
@@ -89,6 +111,7 @@ class NewImageHandler(FileSystemEventHandler):
                     latest_image_state = new_state
                     for q in list(subscribers):
                         self.loop.call_soon_threadsafe(q.put_nowait, new_state)
+                    cleanup_old_images()
 
 @app.on_event("startup")
 async def startup_event():
