@@ -149,7 +149,7 @@ const MultiPOInfo = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
+          `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
           { po_ids: poIds },
           { headers: { Authorization: `Bearer ${token}` } }
         );

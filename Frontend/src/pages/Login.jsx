@@ -18,7 +18,7 @@ export default function Login() {
 
     try {
       const res = await axios.post(
-        "http://wmsbeta.luxkutumb.info/api/login_external_device",
+        `${import.meta.env.VITE_BASE_URL}/login_external_device`,
         {
           email: email,
           password: password,

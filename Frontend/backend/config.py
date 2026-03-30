@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 # FTP Settings
 FTP_HOST = os.getenv("FTP_HOST", "192.168.0.77")

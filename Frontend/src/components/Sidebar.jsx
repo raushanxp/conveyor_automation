@@ -16,7 +16,7 @@ const Sidebar = () => {
 
       if (token) {
         await axios.post(
-          "http://wmsbeta.luxkutumb.info/api/logout_external_device",
+          `${import.meta.env.VITE_BASE_URL}/logout_external_device`,
           {},
           {
             headers: {

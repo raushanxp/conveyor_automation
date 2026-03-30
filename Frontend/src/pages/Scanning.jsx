@@ -106,7 +106,7 @@ const AddPOModal = ({ isOpen, onClose, onConfirm, currentPoIds, isAdding }) => {
         const token   = localStorage.getItem("token");
         const today   = new Date().toISOString().split("T")[0];
         const res     = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/getPurchaseOrderByDate`,
+          `${import.meta.env.VITE_BASE_URL}/sap/getPurchaseOrderByDate`,
           { from_date: "2025-01-10", to_date: today },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -720,7 +720,7 @@ const Scanning = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
+          `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
           { po_ids: poIds },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -749,7 +749,7 @@ const Scanning = () => {
     try {
       const token = localStorage.getItem("token");
       const res   = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
+        `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
         { po_ids: newIds },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -964,7 +964,7 @@ const Scanning = () => {
       : poIds.map(String);
 
     const res = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/verify-challan-number`,
+      `${import.meta.env.VITE_BASE_URL}/sap/verify-challan-number`,
       { challan_number: challanNumber.trim(), pos: poOrderCodes },
       { headers: { Authorization: `Bearer ${token}` } }
     );
@@ -1194,7 +1194,7 @@ const Scanning = () => {
       if (!token) { toast.error("❌ Authentication error: Please log in again"); setIsSyncing(false); return; }
 
       const payload = buildSyncPayload();
-      const res     = await axios.post(`${import.meta.env.VITE_BASE_URL}/inward`, [payload], {
+      const res     = await axios.post(`${import.meta.env.VITE_BASE_URL}/sap/inward`, [payload], {
         headers: { Authorization: `Bearer ${token}` },
         validateStatus: (status) => status < 600,
       });
