@@ -60,7 +60,7 @@ export default function Login() {
         {/* Left Panel */}
         <div className="relative w-[320px] flex-shrink-0">
           <img
-            src="/Side-image.png"
+            src="/luxlogin.jpeg"
             alt="LUXWarehouse"
             className="w-full h-full object-cover"
           />
@@ -144,20 +144,7 @@ export default function Login() {
           </div>
 
           {/* Remember + Forgot */}
-          <div className="flex items-center justify-between mb-6">
-            <label className="flex items-center gap-2 text-[13px] text-gray-500 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={() => setRemember(!remember)}
-                className="w-4 h-4 accent-blue-600 cursor-pointer"
-              />
-              Remember me
-            </label>
-            <a href="#" className="text-[13px] text-[#155DFC] font-medium hover:underline">
-              Forgot Password?
-            </a>
-          </div>
+         
 
           {/* Login Button */}
           <button

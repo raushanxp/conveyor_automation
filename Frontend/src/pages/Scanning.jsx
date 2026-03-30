@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Play, CheckCircle, ChevronDown, AlertTriangle, XCircle, Check,
   Camera, Layers, AlertCircle, Scan, Upload, Loader2, CalendarDays,
-  ShieldCheck, ShieldX, Package, PackageX, MapPin,
+  ShieldCheck, ShieldX, Package, PackageX, MapPin, Plus, Search, X,
 } from "lucide-react";
 import Layout from "../components/Layout";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -38,7 +38,6 @@ const loadSession = () => {
 
 const clearSession = () => { try { localStorage.removeItem(SESSION_KEY); } catch {} };
 
-// ─── Challan cache helpers (1-hour TTL) ────────────────────────────────────
 const CHALLAN_CACHE_KEY = "verified_challans";
 const CHALLAN_TTL_MS    = 60 * 60 * 1000;
 
@@ -71,7 +70,6 @@ const cacheChallan = (challan) => {
     localStorage.setItem(CHALLAN_CACHE_KEY, JSON.stringify(cache));
   } catch {}
 };
-// ───────────────────────────────────────────────────────────────────────────
 
 const PO_COLORS = [
   { bg: "bg-indigo-100", text: "text-indigo-700", dot: "bg-indigo-500", bar: "bg-indigo-400", border: "border-indigo-200" },
@@ -91,20 +89,224 @@ const DEFAULT_REJECTED_LOC = "0020";
 const STALL_TIMEOUT_MS     = 400;
 const setBeltStatus = (running) => localStorage.setItem("belt_running", running ? "true" : "false");
 
-// ─── Composite key helpers ──────────────────────────────────────────────────
 const makeItemKey = (orderCode, sku) => `${orderCode}::${sku}`;
-// ───────────────────────────────────────────────────────────────────────────
+
+// ─── Add PO Modal ────────────────────────────────────────────────────────────
+const AddPOModal = ({ isOpen, onClose, onConfirm, currentPoIds, isAdding }) => {
+  const [allOrders, setAllOrders]     = useState([]);
+  const [fetchingList, setFetchingList] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  useEffect(() => {
+    if (!isOpen) { setSelectedIds(new Set()); setSearchQuery(""); return; }
+    const fetchAll = async () => {
+      setFetchingList(true);
+      try {
+        const token   = localStorage.getItem("token");
+        const today   = new Date().toISOString().split("T")[0];
+        const res     = await axios.post(
+          `${import.meta.env.VITE_BASE_URL}/getPurchaseOrderByDate`,
+          { from_date: "2025-01-10", to_date: today },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (res.data.status === "success") {
+          const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
+          // Filter out already-selected POs
+          setAllOrders(data.filter((o) => !currentPoIds.includes(o.id)));
+        } else {
+          toast.error("Failed to fetch PO list.");
+        }
+      } catch {
+        toast.error("Network error fetching PO list.");
+      } finally {
+        setFetchingList(false);
+      }
+    };
+    fetchAll();
+  }, [isOpen]); // eslint-disable-line
+
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    if (!q) return allOrders;
+    return allOrders.filter(
+      (o) =>
+        String(o.order_code).toLowerCase().includes(q) ||
+        String(o.id).toLowerCase().includes(q) ||
+        (o.vendor_name ?? "").toLowerCase().includes(q) ||
+        (o.vendor_code ?? "").toLowerCase().includes(q)
+    );
+  }, [allOrders, searchQuery]);
+
+  const toggle = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  if (!isOpen) return null;
+
+  const statusColor = (s) => {
+    if (s === "Pending")   return "bg-amber-50 text-amber-600";
+    if (s === "Picking")   return "bg-blue-50 text-blue-500";
+    if (s === "Completed") return "bg-emerald-50 text-emerald-600";
+    return "bg-slate-100 text-slate-500";
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[85vh]">
+
+        {/* Header */}
+        <div className="bg-indigo-50 px-6 py-5 flex items-start gap-4 border-b border-indigo-100 shrink-0">
+          <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+            <Plus className="text-indigo-600" size={20} strokeWidth={2.5} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-bold text-slate-900">Add Purchase Order</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select the missing PO(s) to add to this inward session.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="cursor-pointer w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-indigo-100 hover:text-slate-600 transition-colors shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-6 py-3 border-b border-slate-100 shrink-0">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by PO code, vendor, ID…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* PO List */}
+        <div className="overflow-y-auto flex-1 px-6 py-3 flex flex-col gap-2">
+          {fetchingList ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="w-7 h-7 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+              <p className="text-sm text-slate-400 font-medium">Loading orders…</p>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mb-1">
+                <Scan size={20} className="text-slate-300" />
+              </div>
+              <p className="text-sm font-semibold text-slate-500">No available POs</p>
+              <p className="text-xs text-slate-400">
+                {searchQuery ? "No results match your search." : "All POs are already added to this session."}
+              </p>
+            </div>
+          ) : (
+            filtered.map((o) => {
+              const isSelected = selectedIds.has(o.id);
+              const displayStatus = o.order_status === "Picking" ? "Partial" : o.order_status;
+              return (
+                <button
+                  key={o.id}
+                  onClick={() => toggle(o.id)}
+                  className={`cursor-pointer w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
+                    isSelected
+                      ? "bg-indigo-50 border-indigo-200 shadow-sm"
+                      : "bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                  }`}
+                >
+                  {/* Checkbox */}
+                  <div
+                    className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      isSelected ? "bg-indigo-500 border-indigo-500" : "border-slate-300"
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                        <path d="M1 4.5L4 7.5L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-sm font-bold ${isSelected ? "text-indigo-700" : "text-slate-800"}`}>
+                        PO-{o.order_code}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${statusColor(o.order_status)}`}>
+                        {displayStatus}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                      ID: {o.id}
+                      {o.vendor_name ? ` · ${o.vendor_name}` : ""}
+                      {o.order_date ? ` · ${o.order_date}` : ""}
+                    </p>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+          <span className="text-xs text-slate-400 font-medium">
+            {selectedIds.size > 0
+              ? `${selectedIds.size} PO${selectedIds.size > 1 ? "s" : ""} selected`
+              : "Select POs to add"}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              disabled={isAdding}
+              className="cursor-pointer px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => onConfirm([...selectedIds])}
+              disabled={selectedIds.size === 0 || isAdding}
+              className="cursor-pointer px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 min-w-[120px] justify-center"
+            >
+              {isAdding
+                ? <><Loader2 size={15} className="animate-spin" /> Adding…</>
+                : <><Plus size={15} /> Add to Session</>}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 const SyncModal = ({
   isOpen, onClose, onConfirm, isSyncing,
-  // detail props
   orderLabel, challanNumber, selectedDate, fgLocation,
   totalQRs, totalUnitsScanned, looseTotalQty, rejectedTotalQty, grandTotal,
   ordersData, allProducts, looseData, rejectedData, packedPerPO,
 }) => {
   if (!isOpen) return null;
 
-  // Build per-PO summary rows
   const poRows = ordersData.map((o) => {
     const qrCount  = Object.values(packedPerPO[o.order_code] || {}).reduce((s, v) => s + v, 0);
     const looseItems = allProducts
@@ -121,8 +323,6 @@ const SyncModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
       <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-
-        {/* Header */}
         <div className="bg-indigo-50 px-6 py-5 flex items-start gap-4 border-b border-indigo-100 shrink-0">
           <div className="w-11 h-11 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
             <Upload className="text-indigo-600" size={20} strokeWidth={2.5} />
@@ -132,11 +332,7 @@ const SyncModal = ({
             <p className="text-xs text-slate-500 mt-0.5">Review all quantities before submitting. This cannot be undone.</p>
           </div>
         </div>
-
-        {/* Scrollable body */}
         <div className="overflow-y-auto flex-1 px-6 py-4 flex flex-col gap-4">
-
-          {/* Meta row */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-100">
               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Challan</p>
@@ -151,8 +347,6 @@ const SyncModal = ({
               <p className="text-xs font-bold text-slate-800">{fgLabel}</p>
             </div>
           </div>
-
-          {/* Grand total summary */}
           <div className="grid grid-cols-4 gap-2">
             <div className="bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-2.5 text-center">
               <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest mb-0.5">QR Codes</p>
@@ -171,13 +365,10 @@ const SyncModal = ({
               <p className="text-lg font-bold text-red-600 tabular-nums leading-none">{rejectedTotalQty}</p>
             </div>
           </div>
-
-          {/* Per-PO breakdown */}
           <div className="flex flex-col gap-2">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Per-PO Breakdown</p>
-            {poRows.map((row, idx) => (
+            {poRows.map((row) => (
               <div key={row.code} className="border border-slate-200 rounded-xl overflow-hidden">
-                {/* PO title bar */}
                 <div className="px-4 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">PO-{row.code}</span>
                   <div className="flex items-center gap-2">
@@ -198,8 +389,6 @@ const SyncModal = ({
                     )}
                   </div>
                 </div>
-
-                {/* SKU rows — only show if loose or rejected exist */}
                 {(row.looseItems.length > 0 || row.rejectedItems.length > 0) && (
                   <div className="divide-y divide-slate-50">
                     {row.looseItems.map((item) => (
@@ -224,8 +413,6 @@ const SyncModal = ({
                     ))}
                   </div>
                 )}
-
-                {/* If nothing loose/rejected, just show a quiet "QR only" note */}
                 {row.looseItems.length === 0 && row.rejectedItems.length === 0 && row.qrCount === 0 && (
                   <div className="px-4 py-2">
                     <span className="text-[11px] text-slate-400 italic">No data to sync for this PO</span>
@@ -234,8 +421,6 @@ const SyncModal = ({
               </div>
             ))}
           </div>
-
-          {/* Grand total footer line */}
           <div className="bg-slate-800 rounded-xl px-4 py-3 flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Grand Total</span>
             <div className="flex items-center gap-1.5">
@@ -243,10 +428,7 @@ const SyncModal = ({
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">units</span>
             </div>
           </div>
-
         </div>
-
-        {/* Footer buttons */}
         <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
           <button onClick={onClose} disabled={isSyncing} className="cursor-pointer px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50">
             Cancel
@@ -255,13 +437,11 @@ const SyncModal = ({
             {isSyncing ? <><Loader2 size={16} className="animate-spin" /> Syncing...</> : <><Upload size={16} /> Confirm Sync</>}
           </button>
         </div>
-
       </div>
     </div>
   );
 };
 
-// ─── ClearConfirmModal ──────────────────────────────────────────────────────
 const ClearConfirmModal = ({ isOpen, onClose, onConfirm, qrCount, looseQty, rejectedQty }) => {
   if (!isOpen) return null;
   const total = qrCount + looseQty + rejectedQty;
@@ -281,8 +461,6 @@ const ClearConfirmModal = ({ isOpen, onClose, onConfirm, qrCount, looseQty, reje
             </p>
           </div>
         </div>
-
-        {/* Breakdown */}
         <div className="px-6 py-4 flex flex-col gap-2">
           {qrCount > 0 && (
             <div className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2.5">
@@ -312,18 +490,11 @@ const ClearConfirmModal = ({ isOpen, onClose, onConfirm, qrCount, looseQty, reje
             </div>
           )}
         </div>
-
         <div className="px-6 pb-6 flex items-center justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="cursor-pointer px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
-          >
+          <button onClick={onClose} className="cursor-pointer px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
             Cancel
           </button>
-          <button
-            onClick={onConfirm}
-            className="cursor-pointer px-5 py-2.5 rounded-xl bg-[#e60000] text-white text-sm font-semibold shadow-[0_6px_16px_rgba(230,0,0,0.25)] hover:bg-red-700 transition-all flex items-center gap-2"
-          >
+          <button onClick={onConfirm} className="cursor-pointer px-5 py-2.5 rounded-xl bg-[#e60000] text-white text-sm font-semibold shadow-[0_6px_16px_rgba(230,0,0,0.25)] hover:bg-red-700 transition-all flex items-center gap-2">
             <XCircle size={15} /> Clear all
           </button>
         </div>
@@ -331,7 +502,6 @@ const ClearConfirmModal = ({ isOpen, onClose, onConfirm, qrCount, looseQty, reje
     </div>
   );
 };
-// ───────────────────────────────────────────────────────────────────────────
 
 const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items", hideRescan = false }) => {
   if (!isOpen) return null;
@@ -360,18 +530,17 @@ const ErrorPopup = ({ isOpen, onDismiss, onRescan, missingCode = "Missing Items"
 
 const FTPCameraFeed = () => {
   const [imageUrl, setImageUrl] = useState(null);
-  const [error, setError] = useState(null);
+  const [error, setError]       = useState(null);
 
   useEffect(() => {
     let eventSource;
-
     const connectSSE = () => {
       eventSource = new EventSource("http://localhost:8000/stream-latest-image");
       eventSource.onopen = () => { setError(null); };
       eventSource.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data && data.public_url) {
+          if (data?.public_url) {
             const cacheBuster = data.upload_timestamp || Date.now();
             setImageUrl(`http://localhost:8000${data.public_url}?t=${encodeURIComponent(cacheBuster)}`);
             setError(null);
@@ -385,7 +554,6 @@ const FTPCameraFeed = () => {
         setTimeout(connectSSE, 3000);
       };
     };
-
     connectSSE();
     return () => { if (eventSource) eventSource.close(); };
   }, []);
@@ -400,7 +568,7 @@ const FTPCameraFeed = () => {
           onError={(e) => {
             setTimeout(() => {
               if (e.target) {
-                const baseSrc = e.target.src.split('&retry=')[0];
+                const baseSrc = e.target.src.split("&retry=")[0];
                 e.target.src = `${baseSrc}&retry=${Date.now()}`;
               }
             }, 300);
@@ -426,7 +594,6 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// ─── QuantityPanel ──────────────────────────────────────────────────────────
 const QuantityPanel = ({
   title, icon: Icon, iconBg, products, data, onChange,
   defaultLocation, accentColor, packedPerPO, siblingData,
@@ -453,18 +620,15 @@ const QuantityPanel = ({
           />
         </div>
       </div>
-
       <div className="divide-y divide-slate-50">
         {products.map((p) => {
-          const itemKey = makeItemKey(p.orderCode, p.sku);
-          const row     = data[itemKey] ?? { qty: 0, location: data.__defaultLoc ?? defaultLocation };
-
+          const itemKey    = makeItemKey(p.orderCode, p.sku);
+          const row        = data[itemKey] ?? { qty: 0, location: data.__defaultLoc ?? defaultLocation };
           const scanned    = packedPerPO?.[p.orderCode]?.[p.sku] || 0;
           const siblingQty = siblingData?.[itemKey]?.qty || 0;
           const maxQty     = Math.max(0, p.qty - scanned - siblingQty);
           const clamp      = (v) => Math.min(maxQty, Math.max(0, v));
           const atMax      = (row.qty || 0) >= maxQty && maxQty > 0;
-
           return (
             <div key={itemKey} className="px-5 py-2.5 flex items-center gap-3">
               <div className="flex-1 min-w-0">
@@ -481,7 +645,6 @@ const QuantityPanel = ({
                   max {maxQty} &nbsp;·&nbsp; {scanned} scanned · {siblingQty} other · {p.qty} pending
                 </p>
               </div>
-
               <div className="flex items-center gap-1 shrink-0">
                 <MapPin size={10} className="text-slate-300" />
                 <input
@@ -493,7 +656,6 @@ const QuantityPanel = ({
                   placeholder={data.__defaultLoc ?? defaultLocation}
                 />
               </div>
-
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => onChange(itemKey, { ...row, qty: clamp((row.qty || 0) - 1) })}
@@ -516,7 +678,6 @@ const QuantityPanel = ({
                   className="cursor-pointer w-6 h-6 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center text-xs font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                 >+</button>
               </div>
-
               {atMax && (
                 <span className="text-[9px] font-bold bg-amber-100 text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded shrink-0">
                   MAX
@@ -529,8 +690,8 @@ const QuantityPanel = ({
     </section>
   );
 };
-// ───────────────────────────────────────────────────────────────────────────
 
+// ─── Main Scanning Component ─────────────────────────────────────────────────
 const Scanning = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -543,8 +704,12 @@ const Scanning = () => {
     return loadSession();
   }, []); // eslint-disable-line
 
-  const poIds     = navPoIds.length > 0 ? navPoIds : (restoredSession?.poIds || []);
-  const multiMode = navPoIds.length > 1 || (restoredSession?.poIds?.length ?? 0) > 1 || navMultiMode;
+  // ─── poIds is now STATE so we can add to it live ──────────────────────────
+  const [poIds, setPoIds] = useState(
+    navPoIds.length > 0 ? navPoIds : (restoredSession?.poIds || [])
+  );
+  const multiMode = poIds.length > 1 || navMultiMode;
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [ordersData, setOrdersData]   = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -554,16 +719,60 @@ const Scanning = () => {
     const fetchOrderDetails = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post(`${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
-          { po_ids: poIds }, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.post(
+          `${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
+          { po_ids: poIds },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
         if (res.data.status === "success") {
           setOrdersData(Array.isArray(res.data.data) ? res.data.data : [res.data.data]);
-        } else { toast.error(res.data.message || "Failed to fetch order details"); }
-      } catch (err) { console.error(err); toast.error("Network error while fetching order details."); }
-      finally { setDataLoading(false); }
+        } else {
+          toast.error(res.data.message || "Failed to fetch order details");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Network error while fetching order details.");
+      } finally {
+        setDataLoading(false);
+      }
     };
     fetchOrderDetails();
   }, []); // eslint-disable-line
+
+  // ─── Add PO modal state ───────────────────────────────────────────────────
+  const [showAddPOModal, setShowAddPOModal] = useState(false);
+  const [isAddingPO, setIsAddingPO]         = useState(false);
+
+  const handleAddPOs = async (newIds) => {
+    if (!newIds.length) return;
+    setIsAddingPO(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res   = await axios.post(
+        `${import.meta.env.VITE_BASE_URL}/purchase-order-by-ids`,
+        { po_ids: newIds },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.status === "success") {
+        const fetched = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
+        // Merge without duplicates
+        setOrdersData((prev) => {
+          const existingCodes = new Set(prev.map((o) => o.order_code));
+          return [...prev, ...fetched.filter((o) => !existingCodes.has(o.order_code))];
+        });
+        setPoIds((prev) => [...new Set([...prev, ...newIds])]);
+        setShowAddPOModal(false);
+        toast.success(`Added ${fetched.length} PO(s) to this session.`);
+      } else {
+        toast.error(res.data.message || "Failed to fetch new PO details.");
+      }
+    } catch {
+      toast.error("Network error while adding PO(s).");
+    } finally {
+      setIsAddingPO(false);
+    }
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const primaryOrder = ordersData[0] || null;
 
@@ -604,7 +813,10 @@ const Scanning = () => {
 
   useEffect(() => { return () => setBeltStatus(false); }, []);
 
-  const storageKeys = useMemo(() => ordersData.map((o) => (o.order_code ? `scanning_qrs_${o.order_code}` : null)), [ordersData]);
+  const storageKeys = useMemo(
+    () => ordersData.map((o) => (o.order_code ? `scanning_qrs_${o.order_code}` : null)),
+    [ordersData]
+  );
 
   const today = new Date().toISOString().split("T")[0];
   const [challanNumber, setChallanNumber]     = useState(restoredSession?.challanNumber || "");
@@ -620,6 +832,7 @@ const Scanning = () => {
   const handleLooseChange    = (key, val) => setLooseData((prev) => ({ ...prev, [key]: val }));
   const handleRejectedChange = (key, val) => setRejectedData((prev) => ({ ...prev, [key]: val }));
 
+  // Save session whenever poIds changes too
   useEffect(() => {
     if (poIds.length === 0) return;
     saveSession(poIds, challanNumber, challanVerified, selectedDate, fgLocation);
@@ -638,10 +851,7 @@ const Scanning = () => {
   const [showSyncModal, setShowSyncModal]             = useState(false);
   const [isSyncing, setIsSyncing]                     = useState(false);
   const [activePOTab, setActivePOTab]                 = useState("all");
-
-  // ─── NEW: Clear confirm modal state ────────────────────────────────────────
-  const [showClearModal, setShowClearModal] = useState(false);
-  // ───────────────────────────────────────────────────────────────────────────
+  const [showClearModal, setShowClearModal]           = useState(false);
 
   const isBeltRunning      = useRef(false);
   const isProcessingBatch  = useRef(false);
@@ -731,39 +941,59 @@ const Scanning = () => {
 
   const resetStall = () => { lastQRArrivedAt.current = null; prevBatchLengthRef.current = 0; stallFiredRef.current = false; };
 
-  // ─── Challan verification ─────────────────────────────────────────────────
-  const handleVerifyChallan = async () => {
-    if (!challanNumber.trim()) { setChallanError("Please enter a challan number."); return; }
-    setChallanError("");
-    if (isChallanCached(challanNumber)) {
+ const handleVerifyChallan = async () => {
+  if (!challanNumber.trim()) {
+    setChallanError("Please enter a challan number.");
+    return;
+  }
+  setChallanError("");
+
+  if (isChallanCached(challanNumber)) {
+    setChallanVerified(true);
+    toast.success("✓ Challan verified — valid for this session.");
+    return;
+  }
+
+  setIsVerifying(true);
+  try {
+    const token = localStorage.getItem("token");
+
+    // ✅ FIX: Send order_codes (strings), not DB ids
+    const poOrderCodes = ordersData.length > 0
+      ? ordersData.map((o) => String(o.order_code))
+      : poIds.map(String);
+
+    const res = await axios.post(
+      `${import.meta.env.VITE_BASE_URL}/verify-challan-number`,
+      { challan_number: challanNumber.trim(), pos: poOrderCodes },
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    if (res.data.success === true) {
+      cacheChallan(challanNumber);
       setChallanVerified(true);
-      toast.success("Challan verified (from cache).");
-      return;
-    }
-    setIsVerifying(true);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.post(`${import.meta.env.VITE_BASE_URL}/verify-challan-number`,
-        { challan_number: challanNumber.trim() }, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.data.success === true) {
-        cacheChallan(challanNumber);
-        setChallanVerified(true);
-        setChallanError("");
-        toast.success("Challan verified successfully!");
-      } else {
-        setChallanVerified(false);
-        setChallanError(res.data.message || "Challan verification failed.");
-        toast.error(res.data.message || "Invalid challan number.");
-      }
-    } catch {
+      setChallanError("");
+      // ✅ Use the server's message if available
+      toast.success(`✓ ${res.data.message || "Challan verified successfully!"}`);
+    } else {
       setChallanVerified(false);
-      setChallanError("Network error. Please try again.");
-      toast.error("Network error during challan verification.");
-    } finally {
-      setIsVerifying(false);
+      const errMsg = res.data.message || "Invalid challan number. Please check and try again.";
+      setChallanError(errMsg);
+      toast.error(`✗ ${errMsg}`);
     }
-  };
-  // ──────────────────────────────────────────────────────────────────────────
+  } catch (err) {
+    setChallanVerified(false);
+    let errMsg = "Network error. Please check your connection and try again.";
+    if (err.response?.status === 401) errMsg = "Session expired. Please log in again.";
+    else if (err.response?.status === 404) errMsg = "Verification endpoint not found. Contact support.";
+    else if (err.response?.status >= 500) errMsg = "Server error. Please try again shortly.";
+    else if (err.response?.data?.message) errMsg = err.response.data.message;
+    setChallanError(errMsg);
+    toast.error(`✗ ${errMsg}`);
+  } finally {
+    setIsVerifying(false);
+  }
+};
 
   const findOverflowQR = (incomingQRs) => {
     const tc = {};
@@ -810,7 +1040,7 @@ const Scanning = () => {
     const interval = setInterval(async () => {
       try {
         const response = await fetch("http://localhost:5000/api/qr");
-        const data = await response.json();
+        const data     = await response.json();
         if (!data.qr_codes) return;
         const incoming = data.qr_codes;
 
@@ -870,7 +1100,7 @@ const Scanning = () => {
   const controlConveyor = async (command) => {
     try {
       setPlcError(null);
-      const res = await fetch("http://localhost:5000/api/conveyor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command }) });
+      const res  = await fetch("http://localhost:5000/api/conveyor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command }) });
       const data = await res.json();
       if (data.success) { isBeltRunning.current = command === 0; setBeltStatus(command === 0); }
       else setPlcError("Failed to communicate with PLC");
@@ -895,7 +1125,6 @@ const Scanning = () => {
     resetStall(); clearBackendQueue(); controlConveyor(0);
   };
 
-  // ─── Clear everything (QRs + loose + rejected) ────────────────────────────
   const handleClearAllQRs = () => {
     setAllScannedQRs([]);
     allScannedQRsRef.current = [];
@@ -906,9 +1135,7 @@ const Scanning = () => {
     setShowClearModal(false);
     toast("All data cleared.", { icon: "🗑️" });
   };
-  // ──────────────────────────────────────────────────────────────────────────
 
-  // ─── Build sync payload ────────────────────────────────────────────────────
   const buildSyncPayload = () => {
     const perPOQRs = {};
     ordersData.forEach((o) => { perPOQRs[o.order_code] = []; });
@@ -926,29 +1153,20 @@ const Scanning = () => {
 
     const pos = ordersData.map((o) => {
       const qrs = perPOQRs[o.order_code] || [];
-
       const looseSkus = allProducts
         .filter((p) => p.orderCode === o.order_code && (looseData[makeItemKey(p.orderCode, p.sku)]?.qty || 0) > 0)
-        .map((p) => {
-          const row = looseData[makeItemKey(p.orderCode, p.sku)];
-          return { sku_code: p.sku, loose_qty: row.qty };
-        });
+        .map((p) => { const row = looseData[makeItemKey(p.orderCode, p.sku)]; return { sku_code: p.sku, loose_qty: row.qty }; });
       const looseLocKey       = looseData.__defaultLoc ?? DEFAULT_LOOSE_LOC;
       const effectiveLooseLoc = looseSkus.length > 0
         ? (looseData[makeItemKey(o.order_code, looseSkus[0]?.sku_code)]?.location || looseLocKey)
         : looseLocKey;
-
       const rejectedSkus = allProducts
         .filter((p) => p.orderCode === o.order_code && (rejectedData[makeItemKey(p.orderCode, p.sku)]?.qty || 0) > 0)
-        .map((p) => {
-          const row = rejectedData[makeItemKey(p.orderCode, p.sku)];
-          return { sku_code: p.sku, rejected_qty: row.qty };
-        });
+        .map((p) => { const row = rejectedData[makeItemKey(p.orderCode, p.sku)]; return { sku_code: p.sku, rejected_qty: row.qty }; });
       const rejectedLocKey       = rejectedData.__defaultLoc ?? DEFAULT_REJECTED_LOC;
       const effectiveRejectedLoc = rejectedSkus.length > 0
         ? (rejectedData[makeItemKey(o.order_code, rejectedSkus[0]?.sku_code)]?.location || rejectedLocKey)
         : rejectedLocKey;
-
       return {
         po_code: o.order_code || "", supplier_code: o.supplier_code || "", warehouse_code: o.plant_code || "",
         product_qrs: { fresh: { storage_location_id: fgLocation, qr_list: qrs } },
@@ -956,238 +1174,77 @@ const Scanning = () => {
         ...(rejectedSkus.length > 0 && { rejected_item: { storage_location_id: effectiveRejectedLoc, sku_list: rejectedSkus } }),
       };
     });
-
     return { challan_number: challanNumber, challan_rcv_date: selectedDate, pos };
   };
-  // ──────────────────────────────────────────────────────────────────────────
 
   const handleSync = async () => {
-  const _looseTot = Object.entries(looseData)
-    .filter(([k]) => k !== "__defaultLoc")
-    .reduce((s, [, v]) => s + (v?.qty || 0), 0);
-  const _rejectedTot = Object.entries(rejectedData)
-    .filter(([k]) => k !== "__defaultLoc")
-    .reduce((s, [, v]) => s + (v?.qty || 0), 0);
+    const _looseTot    = Object.entries(looseData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
+    const _rejectedTot = Object.entries(rejectedData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
 
-  // Check if there's anything to sync
-  if (allScannedQRs.length === 0 && _looseTot === 0 && _rejectedTot === 0) {
-    toast.error("Nothing to sync.");
-    return;
-  }
+    if (allScannedQRs.length === 0 && _looseTot === 0 && _rejectedTot === 0) { toast.error("Nothing to sync."); return; }
+    if (!challanNumber?.trim()) { toast.error("❌ Missing: Challan number is required"); return; }
+    if (!challanVerified)       { toast.error("❌ Missing: Please verify the challan number before syncing"); return; }
+    if (!selectedDate)          { toast.error("❌ Missing: Inward date is required"); return; }
+    if (!fgLocation)            { toast.error("❌ Missing: FG storage location is required"); return; }
+    if (ordersData.length === 0){ toast.error("❌ Missing: No purchase orders selected"); return; }
 
-  // Validate required fields before syncing
-  if (!challanNumber || !challanNumber.trim()) {
-    toast.error("❌ Missing: Challan number is required");
-    return;
-  }
+    setIsSyncing(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) { toast.error("❌ Authentication error: Please log in again"); setIsSyncing(false); return; }
 
-  if (!challanVerified) {
-    toast.error("❌ Missing: Please verify the challan number before syncing");
-    return;
-  }
-
-  if (!selectedDate) {
-    toast.error("❌ Missing: Inward date is required");
-    return;
-  }
-
-  if (!fgLocation) {
-    toast.error("❌ Missing: FG storage location is required");
-    return;
-  }
-
-  if (ordersData.length === 0) {
-    toast.error("❌ Missing: No purchase orders selected");
-    return;
-  }
-
-  setIsSyncing(true);
-
-  try {
-    const token = localStorage.getItem("token");
-    
-    if (!token) {
-      toast.error("❌ Authentication error: Please log in again");
-      setIsSyncing(false);
-      return;
-    }
-
-    const payload = buildSyncPayload();
-
-    const res = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/inward`,
-      [payload],
-      {
+      const payload = buildSyncPayload();
+      const res     = await axios.post(`${import.meta.env.VITE_BASE_URL}/inward`, [payload], {
         headers: { Authorization: `Bearer ${token}` },
-        validateStatus: (status) => status < 600, // Don't throw on any HTTP status
-      }
-    );
-
-    // Check for successful response
-    const isSuccess =
-      res.status >= 200 &&
-      res.status < 300 &&
-      res.data.status !== false &&
-      res.data.status !== 0 &&
-      res.data.status !== "false" &&
-      res.data.status !== "error";
-
-    if (isSuccess) {
-      const syncedCount = allScannedQRs.length;
-
-      // Clear all localStorage keys
-      storageKeys.forEach((key) => {
-        if (key)
-          try {
-            localStorage.removeItem(key);
-          } catch {}
+        validateStatus: (status) => status < 600,
       });
-      ordersData.forEach((o) => {
-        try {
-          localStorage.removeItem(`packed_${o.order_code}`);
-        } catch {}
-      });
-      clearSession();
 
-      // Reset all in-memory state
-      setAllScannedQRs([]);
-      allScannedQRsRef.current = [];
-      syncedQRsRef.current.clear();
+      const isSuccess =
+        res.status >= 200 && res.status < 300 &&
+        res.data.status !== false && res.data.status !== 0 &&
+        res.data.status !== "false" && res.data.status !== "error";
 
-      // Reset loose & rejected panels
-      setLooseData({ __defaultLoc: DEFAULT_LOOSE_LOC });
-      setRejectedData({ __defaultLoc: DEFAULT_REJECTED_LOC });
-
-      setShowSyncModal(false);
-      setIsSyncing(false);
-
-      toast.success(
-        `✓ Synced ${syncedCount} QR(s) across ${ordersData.length} PO(s) successfully!`
-      );
-    } else {
-      // Handle specific error messages from server
-      let errorMessage = "Sync failed. Please try again.";
-
-      if (res.data) {
-        // Check for specific error messages in response
-        if (res.data.message) {
-          errorMessage = res.data.message;
-        } else if (res.data.error) {
-          errorMessage = res.data.error;
-        } else if (res.data.details) {
-          errorMessage = res.data.details;
-        } else if (typeof res.data === "string") {
-          errorMessage = res.data;
-        }
-
-        // Check for missing fields mentioned in error
-        if (
-          errorMessage.toLowerCase().includes("challan") &&
-          errorMessage.toLowerCase().includes("required")
-        ) {
-          errorMessage = "❌ Missing: Challan number is required";
-        } else if (
-          errorMessage.toLowerCase().includes("date") &&
-          errorMessage.toLowerCase().includes("required")
-        ) {
-          errorMessage = "❌ Missing: Inward date is required";
-        } else if (
-          errorMessage.toLowerCase().includes("location") &&
-          errorMessage.toLowerCase().includes("required")
-        ) {
-          errorMessage = "❌ Missing: Storage location is required";
-        } else if (
-          errorMessage.toLowerCase().includes("qr") &&
-          errorMessage.toLowerCase().includes("empty")
-        ) {
-          errorMessage = "❌ Error: No QR codes to sync";
-        } else if (errorMessage.toLowerCase().includes("duplicate")) {
-          errorMessage = "❌ Error: Duplicate entries detected";
-        } else if (errorMessage.toLowerCase().includes("invalid")) {
-          errorMessage = `❌ Validation Error: ${errorMessage}`;
-        } else if (errorMessage.toLowerCase().includes("unauthorized")) {
-          errorMessage = "❌ Authentication Error: Please log in again";
-        } else if (errorMessage.toLowerCase().includes("forbidden")) {
-          errorMessage = "❌ Permission Error: You don't have access to perform this action";
-        }
-      }
-
-      // Check HTTP status codes
-      if (res.status === 400) {
-        errorMessage = `❌ Bad Request: ${errorMessage}`;
-      } else if (res.status === 401) {
-        errorMessage = "❌ Authentication Error: Please log in again";
-      } else if (res.status === 403) {
-        errorMessage = "❌ Permission Error: Access denied";
-      } else if (res.status === 404) {
-        errorMessage = "❌ Error: Endpoint not found. Please contact support.";
-      } else if (res.status === 422) {
-        errorMessage = `❌ Validation Error: ${errorMessage}`;
-      } else if (res.status >= 500) {
-        errorMessage = `❌ Server Error: ${errorMessage}`;
-      }
-
-      toast.error(errorMessage);
-      setIsSyncing(false);
-    }
-  } catch (err) {
-    console.error("Sync error:", err);
-
-    let errorMessage = "Network error during sync.";
-
-    // Handle network errors
-    if (err.code === "ERR_NETWORK" || err.message.includes("Network Error")) {
-      errorMessage = "❌ Network Error: Please check your internet connection";
-    } else if (err.code === "ECONNABORTED") {
-      errorMessage = "❌ Timeout Error: Request took too long. Please try again.";
-    } else if (err.response) {
-      // Server responded with error status
-      const status = err.response.status;
-      const data = err.response.data;
-
-      if (status === 400) {
-        errorMessage = `❌ Bad Request: ${data?.message || data?.error || "Invalid data sent to server"}`;
-      } else if (status === 401) {
-        errorMessage = "❌ Authentication Error: Please log in again";
-      } else if (status === 403) {
-        errorMessage = "❌ Permission Error: You don't have access to sync data";
-      } else if (status === 404) {
-        errorMessage = "❌ Error: API endpoint not found";
-      } else if (status === 422) {
-        errorMessage = `❌ Validation Error: ${data?.message || data?.error || "Invalid data format"}`;
-      } else if (status >= 500) {
-        errorMessage = `❌ Server Error: ${data?.message || data?.error || "Server is experiencing issues"}`;
+      if (isSuccess) {
+        const syncedCount = allScannedQRs.length;
+        storageKeys.forEach((key) => { if (key) try { localStorage.removeItem(key); } catch {} });
+        ordersData.forEach((o) => { try { localStorage.removeItem(`packed_${o.order_code}`); } catch {} });
+        clearSession();
+        setAllScannedQRs([]); allScannedQRsRef.current = []; syncedQRsRef.current.clear();
+        setLooseData({ __defaultLoc: DEFAULT_LOOSE_LOC });
+        setRejectedData({ __defaultLoc: DEFAULT_REJECTED_LOC });
+        setShowSyncModal(false); setIsSyncing(false);
+        toast.success(`✓ Synced ${syncedCount} QR(s) across ${ordersData.length} PO(s) successfully!`);
       } else {
-        errorMessage = `❌ Error (${status}): ${data?.message || data?.error || "Something went wrong"}`;
+        let errorMessage = res.data?.message || res.data?.error || res.data?.details || "Sync failed. Please try again.";
+        if (res.status === 401) errorMessage = "❌ Authentication Error: Please log in again";
+        else if (res.status === 403) errorMessage = "❌ Permission Error: Access denied";
+        else if (res.status === 404) errorMessage = "❌ Error: Endpoint not found.";
+        else if (res.status >= 500) errorMessage = `❌ Server Error: ${errorMessage}`;
+        toast.error(errorMessage); setIsSyncing(false);
       }
-    } else if (err.request) {
-      // Request was made but no response received
-      errorMessage =
-        "❌ Network Error: No response from server. Please check your connection.";
-    } else if (err.message) {
-      // Something else happened
-      errorMessage = `❌ Error: ${err.message}`;
+    } catch (err) {
+      console.error("Sync error:", err);
+      let errorMessage = "Network error during sync.";
+      if (err.code === "ERR_NETWORK") errorMessage = "❌ Network Error: Please check your internet connection";
+      else if (err.response?.status === 401) errorMessage = "❌ Authentication Error: Please log in again";
+      else if (err.message) errorMessage = `❌ Error: ${err.message}`;
+      toast.error(errorMessage); setIsSyncing(false);
     }
-
-    toast.error(errorMessage);
-    setIsSyncing(false);
-  }
-};
+  };
 
   const displayedProducts = useMemo(() =>
     activePOTab === "all" ? allProducts : allProducts.filter((p) => p.orderCode === activePOTab),
   [allProducts, activePOTab]);
 
-  const orderLabel = multiMode ? `${ordersData.length} POs` : primaryOrder ? `PO-${primaryOrder.order_code}` : "Unknown Order";
-  const canStart   = challanVerified && !!selectedDate && ordersData.length > 0;
+  const orderLabel = multiMode
+    ? `${ordersData.length} POs`
+    : primaryOrder ? `PO-${primaryOrder.order_code}` : "Unknown Order";
 
-  const looseTotalQty    = Object.entries(looseData)
-    .filter(([k]) => k !== "__defaultLoc")
-    .reduce((s, [, v]) => s + (v?.qty || 0), 0);
-  const rejectedTotalQty = Object.entries(rejectedData)
-    .filter(([k]) => k !== "__defaultLoc")
-    .reduce((s, [, v]) => s + (v?.qty || 0), 0);
-  const grandTotal = totalUnitsScanned + looseTotalQty + rejectedTotalQty;
+  const canStart = challanVerified && !!selectedDate && ordersData.length > 0;
+
+  const looseTotalQty    = Object.entries(looseData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
+  const rejectedTotalQty = Object.entries(rejectedData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
+  const grandTotal       = totalUnitsScanned + looseTotalQty + rejectedTotalQty;
 
   if (dataLoading) return <Layout><LoadingSpinner /></Layout>;
 
@@ -1206,12 +1263,20 @@ const Scanning = () => {
                   <Layers size={20} strokeWidth={1.5} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-tight">
                       {multiMode ? "Multi-PO Inward" : (primaryOrder ? `PO-${primaryOrder.order_code}` : "Unknown Order")}
                     </h1>
-                    {multiMode && <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md uppercase tracking-wide">{ordersData.length} POs</span>}
-                    {restoredSession && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md uppercase tracking-wide">Restored</span>}
+                    {multiMode && (
+                      <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md uppercase tracking-wide">
+                        {ordersData.length} POs
+                      </span>
+                    )}
+                    {restoredSession && (
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md uppercase tracking-wide">
+                        Restored
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 font-medium mt-0.5 leading-tight">
                     {allScannedQRs.length} QRs · {totalUnitsScanned}/{totalPendingUnits} pending units · {currentBatchQRs.length} in batch
@@ -1221,8 +1286,10 @@ const Scanning = () => {
 
               {/* Stack size selector */}
               <div className="relative">
-                <button onClick={() => setIsStackDropdownOpen(!isStackDropdownOpen)}
-                  className="cursor-pointer flex items-center gap-2 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all">
+                <button
+                  onClick={() => setIsStackDropdownOpen(!isStackDropdownOpen)}
+                  className="cursor-pointer flex items-center gap-2 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all"
+                >
                   <div className="flex flex-col text-left leading-tight">
                     <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase">Stack</span>
                     <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase">Size:</span>
@@ -1249,10 +1316,12 @@ const Scanning = () => {
                     <div className="border-t border-slate-100 p-4 bg-slate-50/50">
                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">Custom Amount</label>
                       <div className="relative flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                        <input type="number" placeholder="Qty..." value={customAmount}
+                        <input
+                          type="number" placeholder="Qty..." value={customAmount}
                           onChange={(e) => setCustomAmount(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter" && customAmount) { setStackSize(parseInt(customAmount, 10)); setIsStackDropdownOpen(false); setCustomAmount(""); } }}
-                          className="cursor-text w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none" />
+                          className="cursor-text w-full pl-3 pr-12 py-2 text-sm text-slate-700 outline-none"
+                        />
                         <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
                           <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded">PCS</span>
                         </div>
@@ -1261,6 +1330,15 @@ const Scanning = () => {
                   </div>
                 )}
               </div>
+
+              {/* ─── Add PO button ─── */}
+              <button
+                onClick={() => setShowAddPOModal(true)}
+                className="cursor-pointer flex items-center gap-1.5 h-9 px-4 rounded-xl border border-dashed border-indigo-300 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-bold transition-all"
+              >
+                <Plus size={14} />
+                Add PO
+              </button>
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
@@ -1269,8 +1347,10 @@ const Scanning = () => {
                   <AlertTriangle size={13} /> {plcError}
                 </span>
               )}
-              <button onClick={() => { if (grandTotal === 0) { toast.error("Nothing to sync — add QRs, loose, or rejected quantities first."); return; } setShowSyncModal(true); }}
-                className={`cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${grandTotal > 0 ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}>
+              <button
+                onClick={() => { if (grandTotal === 0) { toast.error("Nothing to sync — add QRs, loose, or rejected quantities first."); return; } setShowSyncModal(true); }}
+                className={`cursor-pointer flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm ${grandTotal > 0 ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200" : "bg-slate-100 text-slate-400 cursor-not-allowed"}`}
+              >
                 <Upload size={15} />
                 Sync ({grandTotal})
               </button>
@@ -1287,26 +1367,32 @@ const Scanning = () => {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Challan No.</span>
               <div className="flex gap-2 items-center">
                 <div className="relative">
-                  <input type="text" placeholder="Enter challan number" value={challanNumber}
+                  <input
+                    type="text" placeholder="Enter challan number" value={challanNumber}
                     onChange={(e) => { setChallanNumber(e.target.value); if (challanVerified) setChallanVerified(false); setChallanError(""); }}
                     disabled={challanVerified}
                     className={`cursor-text text-sm px-3 rounded-xl border outline-none transition-all pr-8 w-52 h-9 ${
                       challanVerified ? "bg-emerald-50 border-emerald-200 text-emerald-700 cursor-not-allowed"
                       : challanError  ? "border-red-300 bg-red-50 focus:ring-2 focus:ring-red-100"
                       : "border-slate-200 bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300"
-                    }`} />
+                    }`}
+                  />
                   {challanVerified && <ShieldCheck size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-500" />}
                   {challanError && !challanVerified && <ShieldX size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-red-400" />}
                 </div>
                 {!challanVerified ? (
-                  <button onClick={handleVerifyChallan} disabled={isVerifying || !challanNumber.trim()}
-                    className="cursor-pointer h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={handleVerifyChallan} disabled={isVerifying || !challanNumber.trim()}
+                    className="cursor-pointer h-9 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                  >
                     {isVerifying ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />}
                     {isVerifying ? "Verifying…" : "Verify"}
                   </button>
                 ) : (
-                  <button onClick={() => { setChallanVerified(false); setChallanNumber(""); setChallanError(""); }}
-                    className="cursor-pointer h-9 px-4 rounded-xl bg-emerald-100 hover:bg-red-50 text-emerald-700 hover:text-red-600 text-xs font-bold transition-all border border-emerald-200 hover:border-red-200 shrink-0">
+                  <button
+                    onClick={() => { setChallanVerified(false); setChallanNumber(""); setChallanError(""); }}
+                    className="cursor-pointer h-9 px-4 rounded-xl bg-emerald-100 hover:bg-red-50 text-emerald-700 hover:text-red-600 text-xs font-bold transition-all border border-emerald-200 hover:border-red-200 shrink-0"
+                  >
                     Change
                   </button>
                 )}
@@ -1329,9 +1415,11 @@ const Scanning = () => {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                 <CalendarDays size={10} />Inward Date
               </span>
-              <input type="date" value={selectedDate} min={earliestOrderDate || undefined} max={today}
+              <input
+                type="date" value={selectedDate} min={earliestOrderDate || undefined} max={today}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="cursor-pointer text-sm px-3 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all h-9" />
+                className="cursor-pointer text-sm px-3 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-300 transition-all h-9"
+              />
               <div className="h-4 flex items-center">
                 {earliestOrderDate && <p className="text-[10px] text-slate-400 font-medium leading-none">{earliestOrderDate} → {today}</p>}
               </div>
@@ -1426,13 +1514,17 @@ const Scanning = () => {
               <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
                 {ordersData.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                    <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-3"><AlertTriangle size={20} className="text-amber-400" /></div>
+                    <div className="w-12 h-12 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-3">
+                      <AlertTriangle size={20} className="text-amber-400" />
+                    </div>
                     <p className="text-sm font-semibold text-slate-600">No PO Selected</p>
-                    <p className="text-xs text-slate-400 mt-1">Go back to the dashboard and select a purchase order first.</p>
+                    <p className="text-xs text-slate-400 mt-1">Use the "Add PO" button above to add a purchase order.</p>
                   </div>
                 ) : displayedProducts.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mb-3"><Scan size={20} className="text-slate-300" /></div>
+                    <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center mb-3">
+                      <Scan size={20} className="text-slate-300" />
+                    </div>
                     <p className="text-sm font-medium text-slate-400">No items in this PO</p>
                   </div>
                 ) : (
@@ -1497,32 +1589,15 @@ const Scanning = () => {
               )}
             </section>
 
-            {/* Loose panel  →  siblingData = rejectedData */}
             <QuantityPanel
-              title="Loose Items"
-              icon={Package}
-              iconBg="bg-amber-50"
-              accentColor="text-amber-600"
-              products={displayedProducts}
-              data={looseData}
-              onChange={handleLooseChange}
-              defaultLocation={DEFAULT_LOOSE_LOC}
-              packedPerPO={packedPerPO}
-              siblingData={rejectedData}
+              title="Loose Items" icon={Package} iconBg="bg-amber-50" accentColor="text-amber-600"
+              products={displayedProducts} data={looseData} onChange={handleLooseChange}
+              defaultLocation={DEFAULT_LOOSE_LOC} packedPerPO={packedPerPO} siblingData={rejectedData}
             />
-
-            {/* Rejected panel  →  siblingData = looseData */}
             <QuantityPanel
-              title="Rejected Items"
-              icon={PackageX}
-              iconBg="bg-red-50"
-              accentColor="text-red-500"
-              products={displayedProducts}
-              data={rejectedData}
-              onChange={handleRejectedChange}
-              defaultLocation={DEFAULT_REJECTED_LOC}
-              packedPerPO={packedPerPO}
-              siblingData={looseData}
+              title="Rejected Items" icon={PackageX} iconBg="bg-red-50" accentColor="text-red-500"
+              products={displayedProducts} data={rejectedData} onChange={handleRejectedChange}
+              defaultLocation={DEFAULT_REJECTED_LOC} packedPerPO={packedPerPO} siblingData={looseData}
             />
           </div>
 
@@ -1550,7 +1625,7 @@ const Scanning = () => {
 
               {(looseTotalQty > 0 || rejectedTotalQty > 0) && (
                 <div className="flex items-center gap-2 flex-wrap">
-                  {looseTotalQty    > 0 && <span className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-lg"><Package  size={10} />{looseTotalQty} loose units</span>}
+                  {looseTotalQty > 0    && <span className="flex items-center gap-1.5 bg-amber-50 border border-amber-100 text-amber-700 text-[10px] font-bold px-2.5 py-1 rounded-lg"><Package  size={10} />{looseTotalQty} loose units</span>}
                   {rejectedTotalQty > 0 && <span className="flex items-center gap-1.5 bg-red-50   border border-red-100   text-red-600   text-[10px] font-bold px-2.5 py-1 rounded-lg"><PackageX size={10} />{rejectedTotalQty} rejected units</span>}
                 </div>
               )}
@@ -1636,6 +1711,13 @@ const Scanning = () => {
       </div>
 
       {/* ─── Modals ─── */}
+      <AddPOModal
+        isOpen={showAddPOModal}
+        onClose={() => setShowAddPOModal(false)}
+        onConfirm={handleAddPOs}
+        currentPoIds={poIds}
+        isAdding={isAddingPO}
+      />
       <ClearConfirmModal
         isOpen={showClearModal}
         onClose={() => setShowClearModal(false)}
