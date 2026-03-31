@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import config from "../config";
+
 import {
   Play, CheckCircle, ChevronDown, AlertTriangle, XCircle, Check,
   Camera, Layers, AlertCircle, Scan, Upload, Loader2, CalendarDays,
@@ -93,26 +95,25 @@ const makeItemKey = (orderCode, sku) => `${orderCode}::${sku}`;
 
 // ─── Add PO Modal ────────────────────────────────────────────────────────────
 const AddPOModal = ({ isOpen, onClose, onConfirm, currentPoIds, isAdding }) => {
-  const [allOrders, setAllOrders]     = useState([]);
+  const [allOrders, setAllOrders]       = useState([]);
   const [fetchingList, setFetchingList] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [searchQuery, setSearchQuery]   = useState("");
+  const [selectedIds, setSelectedIds]   = useState(new Set());
 
   useEffect(() => {
     if (!isOpen) { setSelectedIds(new Set()); setSearchQuery(""); return; }
     const fetchAll = async () => {
       setFetchingList(true);
       try {
-        const token   = localStorage.getItem("token");
-        const today   = new Date().toISOString().split("T")[0];
-        const res     = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/sap/getPurchaseOrderByDate`,
+        const token = localStorage.getItem("token");
+        const today = new Date().toISOString().split("T")[0];
+        const res   = await axios.post(
+          `${config.BASE_URL}/sap/getPurchaseOrderByDate`,
           { from_date: "2025-01-10", to_date: today },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.data.status === "success") {
           const data = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
-          // Filter out already-selected POs
           setAllOrders(data.filter((o) => !currentPoIds.includes(o.id)));
         } else {
           toast.error("Failed to fetch PO list.");
@@ -219,7 +220,7 @@ const AddPOModal = ({ isOpen, onClose, onConfirm, currentPoIds, isAdding }) => {
             </div>
           ) : (
             filtered.map((o) => {
-              const isSelected = selectedIds.has(o.id);
+              const isSelected    = selectedIds.has(o.id);
               const displayStatus = o.order_status === "Picking" ? "Partial" : o.order_status;
               return (
                 <button
@@ -231,7 +232,6 @@ const AddPOModal = ({ isOpen, onClose, onConfirm, currentPoIds, isAdding }) => {
                       : "bg-white border-slate-200 hover:bg-slate-50 hover:border-slate-300"
                   }`}
                 >
-                  {/* Checkbox */}
                   <div
                     className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors ${
                       isSelected ? "bg-indigo-500 border-indigo-500" : "border-slate-300"
@@ -243,8 +243,6 @@ const AddPOModal = ({ isOpen, onClose, onConfirm, currentPoIds, isAdding }) => {
                       </svg>
                     )}
                   </div>
-
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={`text-sm font-bold ${isSelected ? "text-indigo-700" : "text-slate-800"}`}>
@@ -318,7 +316,10 @@ const SyncModal = ({
     return { code: o.order_code, qrCount, looseItems, rejectedItems };
   });
 
-  const fgLabel = fgLocation === "0011" ? "0011 — Vest" : "0031 — Brief";
+  const fgLabel =
+  fgLocation === "0011" ? "0011 — Vest" :
+  fgLocation === "0031" ? "0031 — Brief" :
+  fgLocation || "—";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 backdrop-blur-sm p-4">
@@ -661,7 +662,7 @@ const QuantityPanel = ({
                   onClick={() => onChange(itemKey, { ...row, qty: clamp((row.qty || 0) - 1) })}
                   disabled={(row.qty || 0) <= 0}
                   className="cursor-pointer w-6 h-6 rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center text-xs font-bold transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                >−</button>
+                >—</button>
                 <input
                   type="number"
                   min={0}
@@ -704,12 +705,10 @@ const Scanning = () => {
     return loadSession();
   }, []); // eslint-disable-line
 
-  // ─── poIds is now STATE so we can add to it live ──────────────────────────
   const [poIds, setPoIds] = useState(
     navPoIds.length > 0 ? navPoIds : (restoredSession?.poIds || [])
   );
   const multiMode = poIds.length > 1 || navMultiMode;
-  // ─────────────────────────────────────────────────────────────────────────
 
   const [ordersData, setOrdersData]   = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -720,7 +719,7 @@ const Scanning = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
+          `${config.BASE_URL}/sap/purchase-order-by-ids`,
           { po_ids: poIds },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -749,13 +748,12 @@ const Scanning = () => {
     try {
       const token = localStorage.getItem("token");
       const res   = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
+        `${config.BASE_URL}/sap/purchase-order-by-ids`,
         { po_ids: newIds },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.data.status === "success") {
         const fetched = Array.isArray(res.data.data) ? res.data.data : [res.data.data];
-        // Merge without duplicates
         setOrdersData((prev) => {
           const existingCodes = new Set(prev.map((o) => o.order_code));
           return [...prev, ...fetched.filter((o) => !existingCodes.has(o.order_code))];
@@ -825,6 +823,23 @@ const Scanning = () => {
   const [isVerifying, setIsVerifying]         = useState(false);
   const [selectedDate, setSelectedDate]       = useState(restoredSession?.selectedDate || today);
   const [fgLocation, setFgLocation]           = useState(restoredSession?.fgLocation || FG_LOCATIONS[0].id);
+  
+  // ─── CUSTOM DROPDOWN STATE ───────────────────────────────────────────────
+  const [isFgDropdownOpen, setIsFgDropdownOpen] = useState(false);
+  const [customFgCode, setCustomFgCode] = useState("");
+  const fgDropdownRef = useRef(null);
+
+  // Close FG dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (fgDropdownRef.current && !fgDropdownRef.current.contains(event.target)) {
+        setIsFgDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [looseData, setLooseData]       = useState({ __defaultLoc: DEFAULT_LOOSE_LOC });
   const [rejectedData, setRejectedData] = useState({ __defaultLoc: DEFAULT_REJECTED_LOC });
@@ -832,7 +847,6 @@ const Scanning = () => {
   const handleLooseChange    = (key, val) => setLooseData((prev) => ({ ...prev, [key]: val }));
   const handleRejectedChange = (key, val) => setRejectedData((prev) => ({ ...prev, [key]: val }));
 
-  // Save session whenever poIds changes too
   useEffect(() => {
     if (poIds.length === 0) return;
     saveSession(poIds, challanNumber, challanVerified, selectedDate, fgLocation);
@@ -852,6 +866,10 @@ const Scanning = () => {
   const [isSyncing, setIsSyncing]                     = useState(false);
   const [activePOTab, setActivePOTab]                 = useState("all");
   const [showClearModal, setShowClearModal]           = useState(false);
+
+  // ─── SKU selection for partial clear ─────────────────────────────────────
+  const [selectedSkus, setSelectedSkus] = useState(new Set());
+  // ─────────────────────────────────────────────────────────────────────────
 
   const isBeltRunning      = useRef(false);
   const isProcessingBatch  = useRef(false);
@@ -930,7 +948,7 @@ const Scanning = () => {
 
   const totalPendingUnits = useMemo(() => allProducts.reduce((s, p) => s + p.qty, 0), [allProducts]);
 
-  useEffect(() => { stackSizeRef.current      = stackSize;       }, [stackSize]);
+  useEffect(() => { stackSizeRef.current      = stackSize;        }, [stackSize]);
   useEffect(() => { currentBatchRef.current   = currentBatchQRs; }, [currentBatchQRs]);
   useEffect(() => { showErrorPopupRef.current = showErrorPopup;  }, [showErrorPopup]);
   useEffect(() => { allScannedQRsRef.current  = allScannedQRs;   }, [allScannedQRs]);
@@ -941,59 +959,56 @@ const Scanning = () => {
 
   const resetStall = () => { lastQRArrivedAt.current = null; prevBatchLengthRef.current = 0; stallFiredRef.current = false; };
 
- const handleVerifyChallan = async () => {
-  if (!challanNumber.trim()) {
-    setChallanError("Please enter a challan number.");
-    return;
-  }
-  setChallanError("");
+  const handleVerifyChallan = async () => {
+    if (!challanNumber.trim()) {
+      setChallanError("Please enter a challan number.");
+      return;
+    }
+    setChallanError("");
 
-  if (isChallanCached(challanNumber)) {
-    setChallanVerified(true);
-    toast.success("✓ Challan verified — valid for this session.");
-    return;
-  }
-
-  setIsVerifying(true);
-  try {
-    const token = localStorage.getItem("token");
-
-    // ✅ FIX: Send order_codes (strings), not DB ids
-    const poOrderCodes = ordersData.length > 0
-      ? ordersData.map((o) => String(o.order_code))
-      : poIds.map(String);
-
-    const res = await axios.post(
-      `${import.meta.env.VITE_BASE_URL}/sap/verify-challan-number`,
-      { challan_number: challanNumber.trim(), pos: poOrderCodes },
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    if (res.data.success === true) {
-      cacheChallan(challanNumber);
+    if (isChallanCached(challanNumber)) {
       setChallanVerified(true);
-      setChallanError("");
-      // ✅ Use the server's message if available
-      toast.success(`✓ ${res.data.message || "Challan verified successfully!"}`);
-    } else {
+      toast.success("✓ Challan verified — valid for this session.");
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const token = localStorage.getItem("token");
+      const poOrderCodes = ordersData.length > 0
+        ? ordersData.map((o) => String(o.order_code))
+        : poIds.map(String);
+
+      const res = await axios.post(
+        `${config.BASE_URL}/sap/verify-challan-number`,
+        { challan_number: challanNumber.trim(), pos: poOrderCodes },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data.success === true) {
+        cacheChallan(challanNumber);
+        setChallanVerified(true);
+        setChallanError("");
+        toast.success(`✓ ${res.data.message || "Challan verified successfully!"}`);
+      } else {
+        setChallanVerified(false);
+        const errMsg = res.data.message || "Invalid challan number. Please check and try again.";
+        setChallanError(errMsg);
+        toast.error(`✗ ${errMsg}`);
+      }
+    } catch (err) {
       setChallanVerified(false);
-      const errMsg = res.data.message || "Invalid challan number. Please check and try again.";
+      let errMsg = "Network error. Please check your connection and try again.";
+      if (err.response?.status === 401) errMsg = "Session expired. Please log in again.";
+      else if (err.response?.status === 404) errMsg = "Verification endpoint not found. Contact support.";
+      else if (err.response?.status >= 500) errMsg = "Server error. Please try again shortly.";
+      else if (err.response?.data?.message) errMsg = err.response.data.message;
       setChallanError(errMsg);
       toast.error(`✗ ${errMsg}`);
+    } finally {
+      setIsVerifying(false);
     }
-  } catch (err) {
-    setChallanVerified(false);
-    let errMsg = "Network error. Please check your connection and try again.";
-    if (err.response?.status === 401) errMsg = "Session expired. Please log in again.";
-    else if (err.response?.status === 404) errMsg = "Verification endpoint not found. Contact support.";
-    else if (err.response?.status >= 500) errMsg = "Server error. Please try again shortly.";
-    else if (err.response?.data?.message) errMsg = err.response.data.message;
-    setChallanError(errMsg);
-    toast.error(`✗ ${errMsg}`);
-  } finally {
-    setIsVerifying(false);
-  }
-};
+  };
 
   const findOverflowQR = (incomingQRs) => {
     const tc = {};
@@ -1132,9 +1147,51 @@ const Scanning = () => {
     storageKeys.forEach((key) => { if (key) try { localStorage.removeItem(key); } catch {} });
     setLooseData({ __defaultLoc: DEFAULT_LOOSE_LOC });
     setRejectedData({ __defaultLoc: DEFAULT_REJECTED_LOC });
+    setSelectedSkus(new Set());
     setShowClearModal(false);
     toast("All data cleared.", { icon: "🗑️" });
   };
+
+  // ─── Clear scan data for only the selected SKUs ───────────────────────────
+  const handleClearSelectedSkus = () => {
+    if (selectedSkus.size === 0) return;
+
+    const remaining = allScannedQRs.filter((qr) => {
+      const { sku } = parseQR(qr);
+      return !selectedSkus.has(sku);
+    });
+
+    syncedQRsRef.current.clear();
+    remaining.forEach((qr) => syncedQRsRef.current.add(qr));
+
+    setAllScannedQRs(remaining);
+    allScannedQRsRef.current = remaining;
+
+    setLooseData((prev) => {
+      const next = { ...prev };
+      selectedSkus.forEach((sku) => {
+        Object.keys(next).forEach((k) => {
+          if (k !== "__defaultLoc" && k.endsWith(`::${sku}`)) delete next[k];
+        });
+      });
+      return next;
+    });
+
+    setRejectedData((prev) => {
+      const next = { ...prev };
+      selectedSkus.forEach((sku) => {
+        Object.keys(next).forEach((k) => {
+          if (k !== "__defaultLoc" && k.endsWith(`::${sku}`)) delete next[k];
+        });
+      });
+      return next;
+    });
+
+    const count = selectedSkus.size;
+    setSelectedSkus(new Set());
+    toast.success(`Cleared scan data for ${count} SKU${count > 1 ? "s" : ""}.`);
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   const buildSyncPayload = () => {
     const perPOQRs = {};
@@ -1146,7 +1203,7 @@ const Scanning = () => {
       let assigned = false;
       for (const pe of pos) {
         const k = `${pe.orderCode}::${sku}`;
-        if ((rc[k] || 0) < pe.expectedQty) { rc[k] = (rc[k] || 0) + 1; if (perPOQRs[pe.orderCode]) perPOQRs[pe.orderCode].push(qr); assigned = true; break; }
+        if ((rc[key] || 0) < pe.expectedQty) { rc[key] = (rc[key] || 0) + 1; if (perPOQRs[pe.orderCode]) perPOQRs[pe.orderCode].push(qr); assigned = true; break; }
       }
       if (!assigned && pos.length > 0 && perPOQRs[pos[0].orderCode]) perPOQRs[pos[0].orderCode].push(qr);
     });
@@ -1177,7 +1234,7 @@ const Scanning = () => {
     return { challan_number: challanNumber, challan_rcv_date: selectedDate, pos };
   };
 
-  const handleSync = async () => {
+ const handleSync = async () => {
     const _looseTot    = Object.entries(looseData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
     const _rejectedTot = Object.entries(rejectedData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
 
@@ -1194,7 +1251,7 @@ const Scanning = () => {
       if (!token) { toast.error("❌ Authentication error: Please log in again"); setIsSyncing(false); return; }
 
       const payload = buildSyncPayload();
-      const res     = await axios.post(`${import.meta.env.VITE_BASE_URL}/sap/inward`, [payload], {
+      const res     = await axios.post(`${config.BASE_URL}/sap/inward`, [payload], {
         headers: { Authorization: `Bearer ${token}` },
         validateStatus: (status) => status < 600,
       });
@@ -1208,11 +1265,25 @@ const Scanning = () => {
         const syncedCount = allScannedQRs.length;
         storageKeys.forEach((key) => { if (key) try { localStorage.removeItem(key); } catch {} });
         ordersData.forEach((o) => { try { localStorage.removeItem(`packed_${o.order_code}`); } catch {} });
+        
         clearSession();
+        
+        // 1. Clear Scanned Data
         setAllScannedQRs([]); allScannedQRsRef.current = []; syncedQRsRef.current.clear();
         setLooseData({ __defaultLoc: DEFAULT_LOOSE_LOC });
         setRejectedData({ __defaultLoc: DEFAULT_REJECTED_LOC });
-        setShowSyncModal(false); setIsSyncing(false);
+        setSelectedSkus(new Set());
+        
+        // 2. Clear Page Data (This makes the data disappear from the UI)
+        setPoIds([]);
+        setOrdersData([]);
+        setChallanNumber("");
+        setChallanVerified(false);
+        setChallanError("");
+        setSelectedDate(new Date().toISOString().split("T")[0]); // Resets date to today
+        
+        setShowSyncModal(false); 
+        setIsSyncing(false);
         toast.success(`✓ Synced ${syncedCount} QR(s) across ${ordersData.length} PO(s) successfully!`);
       } else {
         let errorMessage = res.data?.message || res.data?.error || res.data?.details || "Sync failed. Please try again.";
@@ -1245,6 +1316,35 @@ const Scanning = () => {
   const looseTotalQty    = Object.entries(looseData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
   const rejectedTotalQty = Object.entries(rejectedData).filter(([k]) => k !== "__defaultLoc").reduce((s, [, v]) => s + (v?.qty || 0), 0);
   const grandTotal       = totalUnitsScanned + looseTotalQty + rejectedTotalQty;
+
+  // ─── Checkbox helpers ─────────────────────────────────────────────────────
+  const allDisplayedSelected = displayedProducts.length > 0 && displayedProducts.every((p) => selectedSkus.has(p.sku));
+  const someDisplayedSelected = displayedProducts.some((p) => selectedSkus.has(p.sku));
+
+  const toggleSelectAll = () => {
+    if (allDisplayedSelected) {
+      setSelectedSkus((prev) => {
+        const next = new Set(prev);
+        displayedProducts.forEach((p) => next.delete(p.sku));
+        return next;
+      });
+    } else {
+      setSelectedSkus((prev) => {
+        const next = new Set(prev);
+        displayedProducts.forEach((p) => next.add(p.sku));
+        return next;
+      });
+    }
+  };
+
+  const toggleSkuSelection = (sku) => {
+    setSelectedSkus((prev) => {
+      const next = new Set(prev);
+      next.has(sku) ? next.delete(sku) : next.add(sku);
+      return next;
+    });
+  };
+  // ─────────────────────────────────────────────────────────────────────────
 
   if (dataLoading) return <Layout><LoadingSpinner /></Layout>;
 
@@ -1427,23 +1527,89 @@ const Scanning = () => {
 
             <div className="self-stretch w-px bg-slate-100 shrink-0 my-1" />
 
-            {/* FG Storage Location */}
-            <div className="flex flex-col gap-1.5">
+           {/* FG Storage Location */}
+            <div className="flex flex-col gap-1.5" ref={fgDropdownRef}>
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                <MapPin size={10} />FG Storage Location
+                <MapPin size={10} />
+                FG Storage Location
               </span>
-              <div className="flex gap-2">
-                {FG_LOCATIONS.map((loc) => (
-                  <button key={loc.id} onClick={() => setFgLocation(loc.id)}
-                    className={`cursor-pointer h-9 px-4 rounded-xl border text-xs font-bold transition-all ${
-                      fgLocation === loc.id ? "bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-200" : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                    }`}>
-                    {loc.label}
-                  </button>
-                ))}
-              </div>
-              <div className="h-4 flex items-center">
-                <p className="text-[10px] text-slate-400 font-medium leading-none">{fgLocation === "0011" ? "Vest storage" : "Brief storage"}</p>
+
+              <div className="relative w-max">
+                <button
+                  onClick={() => setIsFgDropdownOpen(!isFgDropdownOpen)}
+                  className="cursor-pointer flex items-center gap-2 border border-slate-200 rounded-xl pl-3 pr-2 py-1.5 bg-slate-50 hover:bg-slate-100 outline-none transition-all"
+                >
+                  <div className="flex flex-col text-left leading-tight">
+                    <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase">Storage</span>
+                    <span className="text-[9px] font-bold text-slate-400 tracking-wider uppercase">Loc:</span>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 bg-white border border-slate-200 rounded-lg px-3 py-1.5 min-w-[140px] shadow-sm justify-between">
+                    <span className="text-sm font-bold text-slate-700 truncate max-w-[120px]">
+                      {FG_LOCATIONS.find((loc) => loc.id === fgLocation)?.label || fgLocation || "Select..."}
+                    </span>
+                    <ChevronDown
+                      size={14}
+                      className={`text-slate-400 transition-transform ${isFgDropdownOpen ? "rotate-180" : ""}`}
+                    />
+                  </div>
+                </button>
+
+                {isFgDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full min-w-[220px] bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                    <div className="py-1">
+                      {FG_LOCATIONS.map((loc) => (
+                        <button
+                          key={loc.id}
+                          onClick={() => {
+                            setFgLocation(loc.id);
+                            setIsFgDropdownOpen(false);
+                          }}
+                          className={`cursor-pointer w-full flex items-center justify-between px-4 py-2.5 transition-colors ${
+                            fgLocation === loc.id ? "bg-indigo-50/80 text-indigo-700" : "hover:bg-slate-50 text-slate-600"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <CheckCircle
+                              size={16}
+                              className={fgLocation === loc.id ? "text-indigo-600" : "text-slate-300"}
+                            />
+                            <span className="text-sm font-medium">{loc.label}</span>
+                          </div>
+                          {fgLocation === loc.id && <Check size={16} className="text-indigo-600" />}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="border-t border-slate-100 p-4 bg-slate-50/50">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 block">
+                        Custom Code
+                      </label>
+                      <div className="relative flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                        <input
+                          type="text"
+                          placeholder="Enter code..."
+                          value={customFgCode}
+                          onChange={(e) => setCustomFgCode(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && customFgCode.trim() !== "") {
+                              setFgLocation(customFgCode.trim());
+                              setIsFgDropdownOpen(false);
+                              setCustomFgCode("");
+                            }
+                          }}
+                          className="cursor-text w-full pl-3 pr-14 py-2 text-sm text-slate-700 outline-none font-semibold uppercase placeholder:normal-case"
+                        />
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                          <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded">
+                            LOC
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[9px] text-slate-400 mt-1.5 text-right pr-1">Press Enter to apply</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1475,12 +1641,25 @@ const Scanning = () => {
           <div className="flex-[1.2] flex flex-col gap-6 min-w-0">
             <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col" style={{ minHeight: "540px" }}>
 
+              {/* ─── Order Items Header ─── */}
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-sm font-bold text-slate-900 uppercase">Order Items</h2>
-                  <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">
-                    {totalUnitsScanned} / {totalPendingUnits} pending units
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {/* Clear selected SKUs button — only visible when something is checked */}
+                    {selectedSkus.size > 0 && (
+                      <button
+                        onClick={handleClearSelectedSkus}
+                        className="cursor-pointer flex items-center gap-1.5 text-[10px] font-bold bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 px-2.5 py-1 rounded-md transition-colors uppercase tracking-wide"
+                      >
+                        <XCircle size={11} />
+                        Clear {selectedSkus.size} SKU{selectedSkus.size > 1 ? "s" : ""}
+                      </button>
+                    )}
+                    <span className="text-xs bg-white border border-slate-200 text-slate-600 font-bold px-2.5 py-1 rounded-md tracking-wide shadow-sm">
+                      {totalUnitsScanned} / {totalPendingUnits} pending units
+                    </span>
+                  </div>
                 </div>
                 {multiMode && ordersData.length > 1 && (
                   <div className="flex gap-1.5 flex-wrap">
@@ -1502,7 +1681,30 @@ const Scanning = () => {
                 )}
               </div>
 
-              <div className={`px-5 py-2 border-b border-slate-100 bg-slate-50/30 shrink-0 gap-2 ${multiMode ? "grid grid-cols-[1fr_80px_55px_55px_55px_72px]" : "grid grid-cols-[1fr_55px_55px_55px_72px]"}`}>
+              {/* ─── Column headers with select-all checkbox ─── */}
+              <div className={`px-5 py-2 border-b border-slate-100 bg-slate-50/30 shrink-0 gap-2 ${multiMode ? "grid grid-cols-[28px_1fr_80px_55px_55px_55px_72px]" : "grid grid-cols-[28px_1fr_55px_55px_55px_72px]"}`}>
+                {/* Select-all checkbox */}
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={toggleSelectAll}
+                    className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                      allDisplayedSelected
+                        ? "bg-indigo-500 border-indigo-500"
+                        : someDisplayedSelected
+                        ? "bg-indigo-100 border-indigo-400"
+                        : "border-slate-300 bg-white hover:border-indigo-300"
+                    }`}
+                  >
+                    {allDisplayedSelected && (
+                      <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                        <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                    {!allDisplayedSelected && someDisplayedSelected && (
+                      <div className="w-2 h-0.5 bg-indigo-500 rounded" />
+                    )}
+                  </button>
+                </div>
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">SKU / Name</span>
                 {multiMode && <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">PO</span>}
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Total</span>
@@ -1511,6 +1713,7 @@ const Scanning = () => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Status</span>
               </div>
 
+              {/* ─── Product rows ─── */}
               <div className="divide-y divide-slate-100 overflow-y-auto flex-1">
                 {ordersData.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center px-6">
@@ -1533,13 +1736,37 @@ const Scanning = () => {
                     const displayPending         = product.qty;
                     const displayTotal           = product.totalQty;
                     const displayAlreadyReceived = product.receivedQty;
-                    const isFull = displayPending > 0 && displayReceived >= displayPending;
-                    const isOver = displayPending > 0 && displayReceived > displayPending;
-                    const pct    = displayPending > 0 ? Math.min(100, Math.round((displayReceived / displayPending) * 100)) : 0;
-                    const cc     = PO_COLORS[product.orderIdx % PO_COLORS.length];
+                    const isFull  = displayPending > 0 && displayReceived >= displayPending;
+                    const isOver  = displayPending > 0 && displayReceived > displayPending;
+                    const pct     = displayPending > 0 ? Math.min(100, Math.round((displayReceived / displayPending) * 100)) : 0;
+                    const cc      = PO_COLORS[product.orderIdx % PO_COLORS.length];
+                    const isChecked = selectedSkus.has(product.sku);
                     return (
-                      <div key={`${product.orderCode}-${product.sku}-${i}`}
-                        className={`px-5 py-3 items-center gap-2 transition-colors ${isOver ? "bg-red-50/60" : isFull ? "bg-emerald-50/40" : "hover:bg-slate-50/60"} ${multiMode ? "grid grid-cols-[1fr_80px_55px_55px_55px_72px]" : "grid grid-cols-[1fr_55px_55px_55px_72px]"}`}>
+                      <div
+                        key={`${product.orderCode}-${product.sku}-${i}`}
+                        className={`px-5 py-3 items-center gap-2 transition-colors ${
+                          isOver    ? "bg-red-50/60"
+                          : isFull  ? "bg-emerald-50/40"
+                          : isChecked ? "bg-indigo-50/50"
+                          : "hover:bg-slate-50/60"
+                        } ${multiMode ? "grid grid-cols-[28px_1fr_80px_55px_55px_55px_72px]" : "grid grid-cols-[28px_1fr_55px_55px_55px_72px]"}`}
+                      >
+                        {/* Row checkbox */}
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={() => toggleSkuSelection(product.sku)}
+                            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                              isChecked ? "bg-indigo-500 border-indigo-500" : "border-slate-300 bg-white hover:border-indigo-300"
+                            }`}
+                          >
+                            {isChecked && (
+                              <svg width="9" height="7" viewBox="0 0 9 7" fill="none">
+                                <path d="M1 3.5L3.5 6L8 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div className={`w-2 h-2 rounded-full shrink-0 ${isOver ? "bg-red-500" : isFull ? "bg-emerald-500" : displayReceived > 0 ? cc.dot : "bg-slate-200"}`} />
                           <div className="min-w-0">
@@ -1577,8 +1804,10 @@ const Scanning = () => {
                 )}
               </div>
 
+              {/* ─── Footer totals ─── */}
               {allProducts.length > 0 && (
-                <div className={`px-5 py-3 border-t border-slate-100 bg-slate-50/50 items-center gap-2 shrink-0 ${multiMode ? "grid grid-cols-[1fr_80px_55px_55px_55px_72px]" : "grid grid-cols-[1fr_55px_55px_55px_72px]"}`}>
+                <div className={`px-5 py-3 border-t border-slate-100 bg-slate-50/50 items-center gap-2 shrink-0 ${multiMode ? "grid grid-cols-[28px_1fr_80px_55px_55px_55px_72px]" : "grid grid-cols-[28px_1fr_55px_55px_55px_72px]"}`}>
+                  <span />
                   <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Total</span>
                   {multiMode && <span />}
                   <span className="text-[12px] font-bold text-slate-500 tabular-nums text-center">{displayedProducts.reduce((s, p) => s + p.totalQty, 0)}</span>
@@ -1658,6 +1887,7 @@ const Scanning = () => {
               )}
             </section>
 
+            {/* ─── Scanner Log (Clear button removed) ─── */}
             <section className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold flex items-center gap-2">
@@ -1668,14 +1898,6 @@ const Scanning = () => {
                     <span className="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide">
                       {allScannedQRs.length} QRs
                     </span>
-                  )}
-                  {grandTotal > 0 && (
-                    <button
-                      onClick={() => setShowClearModal(true)}
-                      className="cursor-pointer text-[10px] border border-rose-100 bg-rose-50 text-rose-600 font-bold px-2 py-0.5 rounded-md uppercase tracking-wide hover:bg-rose-100 transition-colors flex items-center gap-1"
-                    >
-                      <XCircle size={10} /> Clear
-                    </button>
                   )}
                 </div>
               </div>

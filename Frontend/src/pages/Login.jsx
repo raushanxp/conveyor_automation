@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import config from "../config";
+
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -18,38 +20,45 @@ export default function Login() {
 
     try {
       const res = await axios.post(
-        `${import.meta.env.VITE_BASE_URL}/login_external_device`,
+        `${config.BASE_URL}/login_external_device`,
         {
           email: email,
           password: password,
         }
       );
 
-      // --- 1. HANDLE SUCCESS EXACTLY AS PER JSON ---
+      // --- 1. HANDLE SUCCESS ---
       if (res.data.status === "success") {
-        // Extract the token exactly where the API puts it
         const token = res.data.data.access_token;
-        
-        // Save the token to local storage
         localStorage.setItem("token", token);
-        
-        // Show the success message directly from the API
         toast.success(res.data.message || "Login Successful 🎉");
 
-        // Send user to the dashboard
         setTimeout(() => {
           navigate("/dashboard");
         }, 1000);
       } 
-      // --- 2. HANDLE ERROR EXACTLY AS PER JSON ---
+      // If the server returns a 200 OK but still sends status: "error"
       else if (res.data.status === "error") {
-        // This will print exactly "User not found"
         toast.error(res.data.message);
       }
 
     } catch (err) {
-      // This will only trigger if your internet drops or the server crashes (e.g., 500 Error)
-      toast.error("Network Error: Could not reach the server.");
+      // --- 2. HANDLE SERVER ERRORS (4xx, 5xx) ---
+      // err.response exists if the server received the request and sent back an error status
+      if (err.response && err.response.data) {
+        const errorData = err.response.data;
+        
+        // Match your specific JSON error response
+        if (errorData.status === "error") {
+          toast.error(errorData.message); // This will show "Incorrect Password"
+        } else {
+          toast.error(errorData.message || "An error occurred during login.");
+        }
+      } 
+      // --- 3. HANDLE ACTUAL NETWORK DROPS ---
+      else {
+        toast.error("Network Error: Could not reach the server.");
+      }
     }
   };
 

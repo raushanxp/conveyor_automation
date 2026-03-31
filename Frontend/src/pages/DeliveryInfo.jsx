@@ -3,6 +3,8 @@ import Layout from "../components/Layout";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import config from "../config";
+
 
 const ITEMS_PER_PAGE = 5;
 
@@ -87,16 +89,11 @@ const TableRow = ({ name, sku, type, qty, received_qty, pending_qty, packed }) =
   );
 };
 
-/* ── Loading Skeleton ── */
-const LoadingSkeleton = () => (
-  <div className="animate-pulse">
-    <div className="h-8 bg-gray-100 rounded-lg mb-4 w-1/3" />
-    <div className="grid grid-cols-4 gap-4 mb-4">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-gray-100 rounded-xl h-24" />
-      ))}
-    </div>
-    <div className="bg-gray-100 rounded-xl h-64" />
+/* ── Loading Spinner ── */
+const LoadingSpinner = () => (
+  <div className="flex flex-col items-center justify-center h-64 gap-4">
+    <div className="w-10 h-10 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin" />
+    <p className="text-sm text-gray-400 font-medium">Loading order details...</p>
   </div>
 );
 
@@ -105,7 +102,6 @@ const DeliveryInfo = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Receive an array of numeric PO ids from Dashboard navigation state
   const poIds = location.state?.poIds || [];
 
   const [ordersData, setOrdersData] = useState([]);
@@ -125,7 +121,7 @@ const DeliveryInfo = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
+          `${config.BASE_URL}/sap/purchase-order-by-ids`,
           { po_ids: poIds },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -147,11 +143,8 @@ const DeliveryInfo = () => {
     fetchOrderDetails();
   }, []); // eslint-disable-line
 
-  // For single PO display — use the first order
   const primaryOrder = ordersData[0] || null;
 
-  // ── Read packed counts from localStorage (written by Scanning page on each successful sync) ──
-  // Key format: "packed_<po_code>" — same key written in Scanning.jsx handleSync
   const packedCounts = (() => {
     try {
       const poCode = primaryOrder?.order_code || "unknown";
@@ -162,7 +155,6 @@ const DeliveryInfo = () => {
     }
   })();
 
-  // ── Build flat list of all delivery items across all POs ──
   const deliveryItems = (() => {
     const items = [];
     ordersData.forEach((order) => {
@@ -173,7 +165,6 @@ const DeliveryInfo = () => {
       if (!Array.isArray(parsedItems)) parsedItems = [];
 
       parsedItems.forEach((item) => {
-        // packed comes from localStorage — 0 if nothing synced yet for this SKU
         const packed = packedCounts[item.sku] || 0;
         items.push({
           name:         item.name         || "Unknown Product",
@@ -190,28 +181,19 @@ const DeliveryInfo = () => {
     return items;
   })();
 
-  // Total quantity across all POs
   const totalQuantity = ordersData.reduce((sum, order) => {
     const qty = parseFloat(order.total_requested_qty || 0);
     return sum + (isNaN(qty) ? 0 : qty);
   }, 0);
 
-  // Total already received across all items
   const totalReceived = deliveryItems.reduce((sum, item) => sum + (item.received_qty || 0), 0);
-
-  // Total pending across all items
-  const totalPending = deliveryItems.reduce((sum, item) => sum + (item.pending_qty || 0), 0);
+  const totalPending  = deliveryItems.reduce((sum, item) => sum + (item.pending_qty  || 0), 0);
 
   const handleStartInwarding = () => {
-    // Pass only the PO ids to Scanning — it will fetch its own data
     if (isMulti) {
-      navigate("/scan", {
-        state: { multiMode: true, poIds },
-      });
+      navigate("/scan", { state: { multiMode: true, poIds } });
     } else {
-      navigate("/scan", {
-        state: { multiMode: false, poIds },
-      });
+      navigate("/scan", { state: { multiMode: false, poIds } });
     }
   };
 
@@ -222,7 +204,7 @@ const DeliveryInfo = () => {
     return (
       <Layout>
         <div className="p-6">
-          <LoadingSkeleton />
+          <LoadingSpinner />
         </div>
       </Layout>
     );

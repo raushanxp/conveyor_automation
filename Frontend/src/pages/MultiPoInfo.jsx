@@ -3,6 +3,8 @@ import Layout from "../components/Layout";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
+import config from "../config";
+
 
 const ITEMS_PER_PAGE = 8;
 
@@ -31,17 +33,11 @@ const IndigoBoxIcon = () => (
   </div>
 );
 
-/* ── Loading Skeleton ── */
-const LoadingSkeleton = () => (
-  <div className="animate-pulse">
-    <div className="h-8 bg-gray-100 rounded-lg mb-4 w-1/3" />
-    <div className="grid grid-cols-3 gap-3 mb-4">
-      {[...Array(3)].map((_, i) => <div key={i} className="bg-gray-100 rounded-xl h-20" />)}
-    </div>
-    <div className="grid grid-cols-4 gap-4 mb-4">
-      {[...Array(4)].map((_, i) => <div key={i} className="bg-gray-100 rounded-xl h-24" />)}
-    </div>
-    <div className="bg-gray-100 rounded-xl h-64" />
+/* ── Loading Spinner ── */
+const LoadingSpinner = () => (
+  <div className="flex flex-col items-center justify-center h-64 gap-4">
+    <div className="w-10 h-10 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin" />
+    <p className="text-sm text-gray-400 font-medium">Loading order details...</p>
   </div>
 );
 
@@ -130,7 +126,6 @@ const MultiPOInfo = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Accepts poIds (array of numeric ids) — same pattern as DeliveryInfo
   const poIds = location.state?.poIds || [];
 
   const [ordersData, setOrdersData] = useState([]);
@@ -149,7 +144,7 @@ const MultiPOInfo = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/sap/purchase-order-by-ids`,
+          `${config.BASE_URL}/sap/purchase-order-by-ids`,
           { po_ids: poIds },
           { headers: { Authorization: `Bearer ${token}` } }
         );
@@ -194,7 +189,7 @@ const MultiPOInfo = () => {
         items.push({
           name:         item.name         || "Unknown Product",
           sku:          item.sku          || "N/A",
-          type:         item.uom          || "PCS",   // ← same as DeliveryInfo
+          type:         item.uom          || "PCS",
           qty:          item.qty          || 0,
           received_qty: item.received_qty || 0,
           pending_qty:  item.pending_qty  || 0,
@@ -219,7 +214,7 @@ const MultiPOInfo = () => {
   const paginated  = filteredItems.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
   /* ── Aggregate stats ── */
-  const totalQty     = allDeliveryItems.reduce((s, i) => s + i.qty, 0);
+  const totalQty      = allDeliveryItems.reduce((s, i) => s + i.qty, 0);
   const totalReceived = allDeliveryItems.reduce((s, i) => s + i.received_qty, 0);
   const totalPending  = allDeliveryItems.reduce((s, i) => s + i.pending_qty, 0);
   const totalPacked   = allDeliveryItems.reduce((s, i) => s + i.packed, 0);
@@ -231,7 +226,13 @@ const MultiPOInfo = () => {
   };
 
   if (loading) {
-    return <Layout><div className="p-6"><LoadingSkeleton /></div></Layout>;
+    return (
+      <Layout>
+        <div className="p-6">
+          <LoadingSpinner />
+        </div>
+      </Layout>
+    );
   }
 
   if (ordersData.length === 0) {

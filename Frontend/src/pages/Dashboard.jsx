@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import config from "../config";
+
 import {
   Clock,
   CheckCircle,
@@ -226,7 +228,7 @@ const Dashboard = () => {
         const currentDate = new Date().toISOString().split("T")[0];
 
         const res = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/sap/getPurchaseOrderByDate`,
+          `${config.BASE_URL}/sap/getPurchaseOrderByDate`,
           { from_date: "2025-01-10", to_date: currentDate },
           { headers: { Authorization: `Bearer ${token}` } }
         );
